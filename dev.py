@@ -38,7 +38,17 @@ def sheets_read_data():
     return pandas.DataFrame(content)
 
 
+def add_dates(data):
+    """
+    Convert year, month, day columns to datetime.date objects
+
+    Return: Nothing, adds "DATE" column to dataframe
+    """
+    data['DATE'] = pandas.to_datetime(data[['YEAR', 'MONTH', 'DAY']]).dt.date
+
+
 # DEBUG: try out a few things
 if __name__ == '__main__':
-    out = sheets_read_data()
+    data = sheets_read_data()
+    add_dates(data)
 
