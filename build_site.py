@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader('templates'),
-        autoescape=jinja2.select_autoescape(['html'])
+        autoescape=jinja2.select_autoescape(['html', 'css'])
         )
 
     index_template = env.get_template('index.html')
@@ -170,4 +170,9 @@ if __name__ == '__main__':
             weekly_bar_script=weekly_bar_script
             )
         index_fp.write(index_content)
+
+    style_template = env.get_template('style.css')
+    with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
+        style_content = style_template.render()
+        style_fp.write(style_content)
 

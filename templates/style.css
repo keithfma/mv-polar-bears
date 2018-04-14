@@ -1,0 +1,23 @@
+html {
+  font-family: 'Signika', sans-serif;
+  font-size: 10px;
+}
+
+body {
+  background-color: #62C8DE;
+}
+
+h1 {
+  font-size: 60px;
+  text-align: center;
+}
+
+
+.bk-plot-layout {
+  width: 95%;
+  margin: 0 auto;
+  margin-top: 25px;
+  margin-bottom: 25px;
+  box-shadow: 10px 10px 5px grey;
+}
+
