@@ -4,14 +4,23 @@
   <head>
     <title>{{ title }}</title>
     <meta charset="UTF-8">
-
-
   </head>
 
   <body>
-      Hello, world!
+    <h1>Martha's Vineyard Polar Bears Data Visualization</h1> 
+    {{ daily_bar_div | safe }}
+    {{ weekly_bar_div | safe }}
+
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.css" rel="stylesheet" type="text/css">
+
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
+
+    {{ daily_bar_script | safe }}
+    {{ weekly_bar_script | safe }}
   </body>
-
-
 
 </html>

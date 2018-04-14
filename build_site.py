@@ -77,20 +77,20 @@ def set_ylabel_to_positive(fig):
     fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
-def daily_bar_plot(data, fname):
+def daily_bar_plot(data):
     """
     Arguments:
         data: pandas dataframe
-        fname: filename for html file
+
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
     """
-    # set output file
-    bk_plt.output_file(fname)
-    
     # create figure
     min_year = min(data['YEAR'])
     max_year = max(data['YEAR'])
     fig = bk_plt.figure(
-        title="Daily Attendence {} to {}".format(min_year, max_year),
+        title="Daily Attendence",
         x_axis_label='Date',
         x_axis_type='datetime',
         y_axis_label='# Attendees',
@@ -109,10 +109,7 @@ def daily_bar_plot(data, fname):
     set_font_size(fig)
     set_ylabel_to_positive(fig)
 
-    # generate file and display in browser
-    bk_plt.show(fig)
-
-    return fig
+    return bk_embed.components(fig)
 
 
 def weekly_bar_plot(data):
@@ -121,17 +118,15 @@ def weekly_bar_plot(data):
         data: pandas dataframe
 
     Returns: script, div
-        script:
-        div:
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
     """
     # compute weekly sums
     weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
 
     # create figure
-    min_year = min(data['YEAR'])
-    max_year = max(data['YEAR'])
     fig = bk_plt.figure(
-        title="Weekly Attendence {} to {}".format(min_year, max_year),
+        title="Weekly Attendence",
         x_axis_label='Week Start Date',
         x_axis_type='datetime',
         y_axis_label='Total # Attendees',
@@ -157,8 +152,8 @@ def weekly_bar_plot(data):
 if __name__ == '__main__':
     # data = sheets_read_data()
     # add_dates(data)
-    # fig = daily_bar_plot(data, 'delete_me.html')
-    script, div = weekly_bar_plot(data)
+    daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader('templates'),
@@ -168,9 +163,11 @@ if __name__ == '__main__':
     index_template = env.get_template('index.html')
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
         index_content = index_template.render(
-            title=WEBPAGE_TITLE
+            title=WEBPAGE_TITLE,
+            daily_bar_div=daily_bar_div,
+            daily_bar_script=daily_bar_script,
+            weekly_bar_div=weekly_bar_div,
+            weekly_bar_script=weekly_bar_script
             )
         index_fp.write(index_content)
-
-
 
