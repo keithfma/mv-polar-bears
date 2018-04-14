@@ -92,8 +92,12 @@ def daily_bar_plot(data, fname):
         )
     
     # add bar plots
-    fig.vbar(x=data['DATE'], width=DAY_TO_MSEC, bottom=0, top=data['GROUP'], color=GROUP_COLOR, legend='Group')
-    fig.vbar(x=data['DATE'], width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0, color=NEWBIES_COLOR, legend='Newbies')
+    fig.vbar(
+        x=data['DATE'], width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
+        color=GROUP_COLOR, legend='Group')
+    fig.vbar(
+        x=data['DATE'], width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
+        color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
     set_font_size(fig)
@@ -116,18 +120,6 @@ def weekly_bar_plot(data, fname):
 
     # set output file
     bplt.output_file(fname)
-
-    # create a hover tool
-    hover = bmdl.HoverTool(
-        tooltips=[
-            ('date', '$x{%d/%m/%Y}'            ),
-            ('count', '$y' ),
-        ],
-        formatters={
-            'date': 'datetime', # use 'datetime' formatter for 'date' field
-        },
-        mode='vline'# display when cursor is vertically in line with a glyph
-    )
     
     # create figure
     min_year = min(data['YEAR'])
@@ -138,12 +130,15 @@ def weekly_bar_plot(data, fname):
         x_axis_type='datetime',
         y_axis_label='Total # Attendees',
         plot_width=1700,
-        tools=[hover]
         )
     
     # add bar plots
-    fig.vbar(x=weekly.index, width=DAY_TO_MSEC*7, bottom=0, top=weekly['GROUP'], color=GROUP_COLOR, legend='Group')
-    fig.vbar(x=weekly.index, width=DAY_TO_MSEC*7, bottom=-weekly['NEWBIES'], top=0, color=NEWBIES_COLOR, legend='Newbies')
+    fig.vbar(
+        x=weekly.index, width=DAY_TO_MSEC*7, bottom=0, top=weekly['GROUP'],
+        color=GROUP_COLOR, legend='Group')
+    fig.vbar(
+        x=weekly.index, width=DAY_TO_MSEC*7, bottom=-weekly['NEWBIES'], top=0,
+        color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
     set_font_size(fig)
