@@ -16,6 +16,12 @@ KEY_FILE = 'secret.json'
 DOC_TITLE = 'MV Polar Bears Attendence'
 SHEET_TITLE = 'Data'
 
+GROUP_COLOR = 'royalblue'
+NEWBIES_COLOR = 'forestgreen'
+FONT_SIZE = '20pt'
+
+DAY_TO_MSEC = 60*60*24*1000
+
 
 def sheets_get_client(key_file):
     """Return authenticated client for Google Sheets"""
@@ -48,33 +54,42 @@ def add_dates(data):
     data['DATE'] = pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]).dt.date
 
 
-def first_plot(data, fname):
-    """Display attendence vs time plot"""
-
+def daily_bar_plot(data, fname):
 
     # set output file
     bplt.output_file(fname)
-
+    
     # create figure
     min_year = min(data['YEAR'])
     max_year = max(data['YEAR'])
     fig = bplt.figure(
-        title="Martha's Vineyard Polar Bears Attendence {} - {}".format(min_year, max_year),
+        title="Martha's Vineyard Polar Bears - Daily Attendence {} to {}".format(min_year, max_year),
         x_axis_label='Date',
-        y_axis_label='Number Attendees'
+        x_axis_type='datetime',
+        y_axis_label='Number Attendees',
+        plot_width=1700,
         )
+    
+    # add bar plots
+    fig.vbar(x=data['DATE'], width=DAY_TO_MSEC, bottom=0, top=data['GROUP'], color=GROUP_COLOR, legend='Group')
+    fig.vbar(x=data['DATE'], width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0, color=NEWBIES_COLOR, legend='Newbies')
 
-    # add lines
-    fig.line(data['DATE'], data['GROUP'], legend='Group', line_color='blue')
-    fig.line(data['DATE'], data['NEWBIES'], legend='Newbies', line_color='green')
+    fig.title.text_font_size = FONT_SIZE
+    fig.xaxis.axis_label_text_font_size = FONT_SIZE
+    fig.yaxis.axis_label_text_font_size = FONT_SIZE
+    fig.xaxis.major_label_text_font_size = FONT_SIZE
+    fig.yaxis.major_label_text_font_size = FONT_SIZE
+    fig.legend.label_text_font_size = FONT_SIZE
 
     # generate file and display in browser
     bplt.show(fig)
-    
+
+    return fig
 
 # DEBUG: try out a few things
 if __name__ == '__main__':
-    data = sheets_read_data()
-    add_dates(data)
-    first_plot(data, 'delete_me.html')
+    #data = sheets_read_data()
+    #add_dates(data)
+    # fig = daily_bar_plot(data, 'delete_me.html')
+    fig = daily_bar_plot(data, 'delete_me.html')
 
