@@ -8,7 +8,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from numpy import nan
 from matplotlib import pyplot as plt
-
+from bokeh import plotting as bplt
 
 # constants
 # TODO: move to a config file
@@ -48,33 +48,33 @@ def add_dates(data):
     data['DATE'] = pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]).dt.date
 
 
-def first_plot(data):
+def first_plot(data, fname):
     """Display attendence vs time plot"""
-    # constants
-    clr_group = 'b'
-    clr_newbies = 'g'
 
-    # plot years independently
-    label_group = 'Group'
-    label_newbies = 'Newbies'
-    years = data['YEAR'].unique()
-    for year in years:
-        year_data = data[data['YEAR'] == year]
-        plt.plot(year_data['DATE'], year_data['GROUP'], color=clr_group, label=label_group)
-        plt.plot(year_data['DATE'], year_data['NEWBIES'], color=clr_newbies, label=label_newbies)
-        label_group = '_nolegend_'
-        label_newbies = '_nolegend_'
 
-    plt.ylim(ymin=0)
-    plt.grid(linestyle=':')
-    plt.legend()
-    plt.title("Martha's Vineyard Polar Bears Attendence {} - {}".format(min(years), max(years)))
-    plt.show()
+    # set output file
+    bplt.output_file(fname)
 
+    # create figure
+    min_year = min(data['YEAR'])
+    max_year = max(data['YEAR'])
+    fig = bplt.figure(
+        title="Martha's Vineyard Polar Bears Attendence {} - {}".format(min_year, max_year),
+        x_axis_label='Date',
+        y_axis_label='Number Attendees'
+        )
+
+    # add lines
+    fig.line(data['DATE'], data['GROUP'], legend='Group', line_color='blue')
+    fig.line(data['DATE'], data['NEWBIES'], legend='Newbies', line_color='green')
+
+    # generate file and display in browser
+    bplt.show(fig)
+    
 
 # DEBUG: try out a few things
 if __name__ == '__main__':
     data = sheets_read_data()
     add_dates(data)
-    first_plot(data)
+    first_plot(data, 'delete_me.html')
 
