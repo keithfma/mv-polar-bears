@@ -7,21 +7,27 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from numpy import nan
-from matplotlib import pyplot as plt
-from bokeh import plotting as bplt
-from bokeh import models as bmdl
+from bokeh import plotting as bk_plt
+from bokeh import models as bk_model
+from bokeh import embed as bk_embed
+import jinja2
+import os
 
 
-# constants
-# TODO: move to a config file
+# config constants
 KEY_FILE = 'secret.json'
 DOC_TITLE = 'MV Polar Bears Attendence'
 SHEET_TITLE = 'Data'
 
+# plot format constants
 GROUP_COLOR = 'royalblue'
 NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '20pt'
 DAY_TO_MSEC = 60*60*24*1000
+
+# webpage constants
+WEBPAGE_TITLE = 'MV Polar Bears!'
+PUBLISH_DIR = 'docs'
 
 
 def sheets_get_client(key_file):
@@ -68,7 +74,7 @@ def set_font_size(fig):
 
 def set_ylabel_to_positive(fig):
     """Replace negative-valued y labels with thier absolute value"""
-    fig.yaxis.formatter = bmdl.FuncTickFormatter(code="return Math.abs(tick)")
+    fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
 def daily_bar_plot(data, fname):
@@ -78,12 +84,12 @@ def daily_bar_plot(data, fname):
         fname: filename for html file
     """
     # set output file
-    bplt.output_file(fname)
+    bk_plt.output_file(fname)
     
     # create figure
     min_year = min(data['YEAR'])
     max_year = max(data['YEAR'])
-    fig = bplt.figure(
+    fig = bk_plt.figure(
         title="Daily Attendence {} to {}".format(min_year, max_year),
         x_axis_label='Date',
         x_axis_type='datetime',
@@ -104,27 +110,27 @@ def daily_bar_plot(data, fname):
     set_ylabel_to_positive(fig)
 
     # generate file and display in browser
-    bplt.show(fig)
+    bk_plt.show(fig)
 
     return fig
 
 
-def weekly_bar_plot(data, fname):
+def weekly_bar_plot(data):
     """
     Arguments:
         data: pandas dataframe
-        fname: filename for html file
+
+    Returns: script, div
+        script:
+        div:
     """
     # compute weekly sums
     weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
 
-    # set output file
-    bplt.output_file(fname)
-    
     # create figure
     min_year = min(data['YEAR'])
     max_year = max(data['YEAR'])
-    fig = bplt.figure(
+    fig = bk_plt.figure(
         title="Weekly Attendence {} to {}".format(min_year, max_year),
         x_axis_label='Week Start Date',
         x_axis_type='datetime',
@@ -144,16 +150,27 @@ def weekly_bar_plot(data, fname):
     set_font_size(fig)
     set_ylabel_to_positive(fig)
 
-    # generate file and display in browser
-    bplt.show(fig)
-
-    return fig
+    return bk_embed.components(fig)
 
 
-# DEBUG: try out a few things
+# TODO: write command-line tool to build site
 if __name__ == '__main__':
     # data = sheets_read_data()
     # add_dates(data)
     # fig = daily_bar_plot(data, 'delete_me.html')
-    fig = weekly_bar_plot(data, 'delete_me.html')
+    script, div = weekly_bar_plot(data)
+
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader('templates'),
+        autoescape=jinja2.select_autoescape(['html'])
+        )
+
+    index_template = env.get_template('index.html')
+    with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
+        index_content = index_template.render(
+            title=WEBPAGE_TITLE
+            )
+        index_fp.write(index_content)
+
+
 
