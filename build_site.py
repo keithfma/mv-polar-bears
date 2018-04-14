@@ -87,14 +87,14 @@ def daily_bar_plot(data):
         div: HTML <div> modified by javascript to show plot
     """
     # create figure
-    min_year = min(data['YEAR'])
-    max_year = max(data['YEAR'])
     fig = bk_plt.figure(
         title="Daily Attendence",
         x_axis_label='Date',
         x_axis_type='datetime',
         y_axis_label='# Attendees',
         plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
         )
     
     # add bar plots
@@ -131,6 +131,8 @@ def weekly_bar_plot(data):
         x_axis_type='datetime',
         y_axis_label='Total # Attendees',
         plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
         )
     
     # add bar plots
