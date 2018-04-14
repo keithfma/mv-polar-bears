@@ -116,6 +116,18 @@ def weekly_bar_plot(data, fname):
 
     # set output file
     bplt.output_file(fname)
+
+    # create a hover tool
+    hover = bmdl.HoverTool(
+        tooltips=[
+            ('date', '$x{%d/%m/%Y}'            ),
+            ('count', '$y' ),
+        ],
+        formatters={
+            'date': 'datetime', # use 'datetime' formatter for 'date' field
+        },
+        mode='vline'# display when cursor is vertically in line with a glyph
+    )
     
     # create figure
     min_year = min(data['YEAR'])
@@ -126,6 +138,7 @@ def weekly_bar_plot(data, fname):
         x_axis_type='datetime',
         y_axis_label='Total # Attendees',
         plot_width=1700,
+        tools=[hover]
         )
     
     # add bar plots
@@ -144,8 +157,8 @@ def weekly_bar_plot(data, fname):
 
 # DEBUG: try out a few things
 if __name__ == '__main__':
-    data = sheets_read_data()
-    add_dates(data)
+    # data = sheets_read_data()
+    # add_dates(data)
     # fig = daily_bar_plot(data, 'delete_me.html')
     fig = weekly_bar_plot(data, 'delete_me.html')
 
