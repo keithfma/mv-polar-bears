@@ -1,7 +1,6 @@
-# Martha's Vineyard Polar Bears!
-
-*This site is an early work-in-progress, please excuse the mess*
-
-## Daily Attendence
-
-## Weekly Attendence
+---
+# You don't need to edit this file, it's empty on purpose.
+# Edit theme's home layout instead if you wanna make some changes
+# See: https://jekyllrb.com/docs/themes/#overriding-theme-defaults
+layout: home
+---
