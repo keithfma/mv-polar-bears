@@ -174,12 +174,12 @@ def get_table_data(data):
     Returns:
         list of dicts, each containing data for a single day, with no gaps
     """
-    table_data = data.replace(nan, '')
+    table_data = data.replace(nan, '-')
     table_dict = table_data.T.to_dict()
     table = []
     for date in sorted(table_data['DATE']):
         table.append(table_dict[date])
-    table.sort(key=lambda x: x['DATE'])
+    table.sort(key=lambda x: x['DATE'], reverse=True)
     return table
 
 

@@ -28,12 +28,12 @@
           </tr>
           <tr>
             {% for day_table in daily_table %}
-            <td> <em>Group:</em> {{ day_table["GROUP"] }} </td>
+            <td> <em>Group:</em> {{ day_table["GROUP"] | int }} </td>
             {% endfor %}
           </tr>
           <tr>
             {% for day_table in daily_table %}
-            <td> <em>Newbies:</em> {{ day_table["NEWBIES"] }} </td>
+            <td> <em>Newbies:</em> {{ day_table["NEWBIES"] | int }} </td>
             {% endfor %}
           </tr>
       </table>
@@ -49,13 +49,6 @@
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
-
-	<script>
-		window.onload = function () {
-		  var recent_data_div = document.getElementById("recent-data");
-		  recent_data_div.scrollLeft = recent_data_div.scrollWidth;
-		}
-    </script>
 
     {{ daily_bar_script | safe }}
     {{ weekly_bar_script | safe }}
