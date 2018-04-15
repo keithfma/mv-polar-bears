@@ -19,6 +19,26 @@
       the latest, greatest data. Enjoy! 
     </p>
 
+    <div id="recent-data">
+      <table>
+          <tr id="recent-data-first-line">
+            {% for day_table in daily_table %}
+            <th> {{ day_table["DAY-OF-WEEK"] }} {{ day_table.MONTH }}/{{ day_table.DAY }}/{{ day_table.YEAR }} </th> 
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Group:</em> {{ day_table["GROUP"] | int }} </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Newbies:</em> {{ day_table["NEWBIES"] | int }} </td>
+            {% endfor %}
+          </tr>
+      </table>
+    </div>
+
     {{ daily_bar_div | safe }}
     {{ weekly_bar_div | safe }}
 

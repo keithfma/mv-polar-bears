@@ -150,12 +150,49 @@ def weekly_bar_plot(data):
     return bk_embed.components(fig)
 
 
+def resample_to_daily(data):
+    """Resample input dataframe to daily resolution (initial cleaning step)"""
+    lookup_day = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+    data = data.resample('D').mean() # daily frequency, no gaps
+    data['DATE'] = pd.Series(
+        {x: x.to_pydatetime().date() for x in data.index})
+    data['YEAR'] = data['DATE'].apply(lambda x: x.year)
+    data['MONTH'] = data['DATE'].apply(lambda x: x.month)
+    data['DAY'] = data['DATE'].apply(lambda x: x.day)
+    data['DAY-OF-WEEK'] = data['DATE'].apply(lambda x: lookup_day[x.weekday()])
+    data.set_index('DATE', drop=False, inplace=True)
+    return data
+
+
+def get_table_data(data):
+    """
+    Munge data to build a daily view of all available data
+    
+    Arguments:
+        data: pandas dataframe
+
+    Returns:
+        list of dicts, each containing data for a single day, with no gaps
+    """
+    table_data = data.replace(nan, '-')
+    table_dict = table_data.T.to_dict()
+    table = []
+    for date in sorted(table_data['DATE']):
+        table.append(table_dict[date])
+    table.sort(key=lambda x: x['DATE'], reverse=True)
+    return table
+
+
 # TODO: write command-line tool to build site
 if __name__ == '__main__':
+
     # data = sheets_read_data()
     # add_dates(data)
-    daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
+    # data = resample_to_daily(data)
+    
+    # daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    # weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
+    daily_table = get_table_data(data)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader('templates'),
@@ -166,6 +203,7 @@ if __name__ == '__main__':
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
+            daily_table=daily_table,
             daily_bar_div=daily_bar_div,
             daily_bar_script=daily_bar_script,
             weekly_bar_div=weekly_bar_div,
