@@ -17,6 +17,34 @@ p {
   margin: 0 auto;
 }
 
+table {
+  font-size: 20px;
+  border-spacing: 20px;
+  border-collapse: collapse;
+}
+
+#recent-data-first-line {
+    border-bottom: 2px solid black;
+}
+
+th, td {
+  text-align: left;
+  min-width: 250px;
+}
+
+td {
+  white-space: nowrap;
+}
+
+#recent-data {
+  width: 80%;
+  margin: 0 auto;
+  overflow-x: auto;
+  margin-top: 50px;
+  margin-bottom: 50px;
+  background-color: white;
+}
+
 .bk-plot-layout {
   width: 95%;
   margin: 0 auto;
