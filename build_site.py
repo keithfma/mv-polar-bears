@@ -1,6 +1,5 @@
 """
-Scratch space for developing key functions before it is clear where they will
-live in the final package
+Generate static website for simple data visualization
 """
 
 import gspread
@@ -12,12 +11,24 @@ from bokeh import models as bk_model
 from bokeh import embed as bk_embed
 import jinja2
 import os
+import requests
+import pytz
+from datetime import datetime, timedelta
+import json
+import math
 
 
 # config constants
-KEY_FILE = 'secret.json'
-DOC_TITLE = 'MV Polar Bears Attendence'
-SHEET_TITLE = 'Data'
+GOOGLE_KEY_FILE = 'google_secret.json'
+GOOGLE_DOC_TITLE = 'MV Polar Bears'
+GOOGLE_SHEET_ATTEND_TITLE = 'Attendance'
+GOOGLE_SHEET_WEATHER_TITLE = 'Weather'
+DARKSKY_KEY_FILE = 'darksky_secret.json'
+
+# physical constants
+INKWELL_LAT = 41.452463 # degrees N
+INKWELL_LON = -70.553526 # degrees E
+US_EASTERN = pytz.timezone('US/Eastern')
 
 # plot format constants
 GROUP_COLOR = 'royalblue'
@@ -28,6 +39,72 @@ DAY_TO_MSEC = 60*60*24*1000
 # webpage constants
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
+
+# misc constants
+
+
+def get_weather_conditions(key_file, lon, lat, dt):
+    """
+    Retrieve forecast or observed weather conditions
+    
+    Note: using the forecast.io Dark Sky API, documented here:
+        https://darksky.net/dev/docs
+    
+    Arguments:
+        lon: longitude of a location (in decimal degrees). Positive is east,
+            negative is west
+        lat: latitude of a location (in decimal degrees). Positive is north,
+            negative is south.
+        dt: datetime, timezone-aware, time for observation
+    
+    Returns: Dict with the following fields (renamed from forecast.io):
+        cloudCover: The percentage of sky occluded by clouds, between 0 and 1, inclusive.
+        humidity: The relative humidity, between 0 and 1, inclusive.
+        precipIntensity: The intensity (in inches of liquid water per hour) of precipitation occurring at the given time. This value is conditional on probability (that is, assuming any precipitation occurs at all) for minutely data points, and unconditional otherwise.
+        precipProbability: The probability of precipitation occurring, between 0 and 1, inclusive.
+        summary: A human-readable text summary of this data point.
+        temperature: The air temperature in degrees Fahrenheit.
+        windBearing: The direction that the wind is coming from in degrees, with true north at 0° and progressing clockwise. (If windSpeed is zero, then this value will not be defined.)
+        windGust: The wind gust speed in miles per hour.
+        windSpeed: The wind speed in miles per hour.
+        ...
+    """
+    # request data from Dark Sky API (e.g. forecast.io)
+    with open(key_file, 'r') as fp:
+        key = json.load(fp)['secret_key']
+    stamp = math.floor(dt.timestamp())
+    url = 'https://api.darksky.net/forecast/{}/{:.10f},{:.10f},{}'.format(
+        key, lat, lon, stamp)
+    params = {'units': 'us'}
+    resp = requests.get(url, params)
+    resp.raise_for_status()
+    data = resp.json()
+    
+    # reformat resulting data
+    fields = {  # forecast.io names -> local names
+        'cloudCover': 'CLOUD-COVER-PERCENT',
+        'humidity': 'HUMIDITY-PERCENT',
+        'precipIntensity': 'PRECIP-RATE-INCHES-PER-HR',
+        'precipProbability': 'PRECIP-PROBABILITY',
+        'summary': 'SUMMARY',
+        'temperature': 'AIR-TEMPERATURE-DEGREES-F',
+        'windBearing': 'WIND-BEARING-CW-DEGREES-FROM-N',
+        'windGust': 'WIND-GUST-SPEED-MPH',
+        'windSpeed': 'WIND-SPEED-MPH',
+        }
+    return {v: data['currently'].get(n, None) for n, v in fields.items()}
+    
+def get_water_conditions():
+    """
+    Retrieve observed water conditions
+    
+    Arguments:
+        ?
+    
+    Returns:
+        ?
+    """
+    pass
 
 
 def sheets_get_client(key_file):
@@ -45,9 +122,9 @@ def sheets_read_data():
 
     Return: pd dataframe containing current data
     """
-    client = sheets_get_client(KEY_FILE)
-    doc = client.open(DOC_TITLE)
-    sheet = doc.worksheet(SHEET_TITLE)
+    client = sheets_get_client(GOOGLE_KEY_FILE)
+    doc = client.open(GOOGLE_DOC_TITLE)
+    sheet = doc.worksheet(GOOGLE_SHEET_ATTEND_TITLE)
     content = sheet.get_all_records(default_blank=nan)
     return pd.DataFrame(content)
 
@@ -183,15 +260,15 @@ def get_table_data(data):
     return table
 
 
-# TODO: write command-line tool to build site
-if __name__ == '__main__':
+def build_site():
+    """Get/update data and build static HTML / JS site"""
 
-    # data = sheets_read_data()
-    # add_dates(data)
-    # data = resample_to_daily(data)
+    data = sheets_read_data()
+    add_dates(data)
+    data = resample_to_daily(data)
     
-    # daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    # weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
+    daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
 
     env = jinja2.Environment(
@@ -216,3 +293,14 @@ if __name__ == '__main__':
         style_content = style_template.render()
         style_fp.write(style_content)
 
+
+# TODO: write command-line wrapper for build_site
+
+
+# DEBUG / TESTING
+if __name__ == '__main__':
+
+    current_time = datetime.now(US_EASTERN) - timedelta(days=50)
+    
+    data = get_weather_conditions(
+        DARKSKY_KEY_FILE, INKWELL_LON, INKWELL_LAT, current_time)
