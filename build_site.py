@@ -16,14 +16,15 @@ import pytz
 from datetime import datetime, timedelta
 import json
 import math
+import dateutil
 
 
 # config constants
-GOOGLE_KEY_FILE = 'google_secret.json'
-GOOGLE_DOC_TITLE = 'MV Polar Bears'
-GOOGLE_SHEET_ATTEND_TITLE = 'Attendance'
-GOOGLE_SHEET_WEATHER_TITLE = 'Weather'
-DARKSKY_KEY_FILE = 'darksky_secret.json'
+GOOGLE_KEY = 'google_secret.json'
+DOC_TITLE = 'MV Polar Bears'
+SHEET_TITLE = 'Data'
+DARKSKY_KEY = 'darksky_secret.json'
+NDBC_STATION = '44020' # Buoy in Nantucket Sound
 
 # physical constants
 INKWELL_LAT = 41.452463 # degrees N
@@ -40,10 +41,109 @@ DAY_TO_MSEC = 60*60*24*1000
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
 
-# misc constants
+
+def get_client(key_file=GOOGLE_KEY, doc_title=DOC_TITLE, sheet_title=SHEET_TITLE):
+    """
+    Return interfaces to Google Sheets data store
+    
+    Arguments:
+        key_file: Google Sheets / Drive API secret key file
+        doc_title: Title / filename for google spreadsheet
+        sheet_title: Title for worksheet within google spreadsheet
+    
+    Returns:
+        client: gspread.client.Client
+        doc: gspread.models.Spreadsheet
+        sheet: gspread.models.Worksheet
+    """
+    scope = ['https://spreadsheets.google.com/feeds',
+             'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
+    client = gspread.authorize(creds)
+    doc = client.open(doc_title)
+    sheet = doc.worksheet(sheet_title)
+    return client, doc, sheet
 
 
-def get_weather_conditions(key_file, lon, lat, dt):
+def read_sheet():
+    """
+    Read current data from Google Sheets
+
+    Return: pd dataframe containing current data
+    """
+    client, doc, sheet = get_client()
+    content = sheet.get_all_records(default_blank=nan)
+    return pd.DataFrame(content)
+
+
+def _parse_datetime(date_str, time_str):
+    """Utility for parsing DATE and TIME columns to python datetime"""
+    dt = dateutil.parser.parse(date_str + ' ' + time_str) 
+    dt = dt.replace(tzinfo=US_EASTERN)
+    return dt    
+
+
+def add_missing_days():
+    """Add (empty) rows in sheet for missing days"""
+    
+    # connect and get current content
+    client, doc, sheet = get_client()
+    content = read_sheet()
+    cid = {x: ii + 1 for ii, x in enumerate(content.columns)}
+    
+    # ensure minimum daily frequency by adding empty rows as needed
+    rid = 3 # 1-based index to google sheet row
+    prev_dt = _parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
+    for ii in range(1, len(content)): # index to local copy
+        row = content.iloc[ii]
+        curr_dt = _parse_datetime(content.iloc[ii]['DATE'], content.iloc[ii]['TIME'])
+        missing_days = (curr_dt - prev_dt).days - 1
+        for jj in range(missing_days):
+            day = prev_dt + timedelta(days=jj + 1)
+            row_values = [nan] * len(content.columns)
+            row_values[cid['DATE']] = day.strftime('%Y-%m-%d')
+            row_values[cid['TIME']] = day.strftime('%H:%M %p')
+            sheet.insert_row(row_values, rid, 'USER_ENTERED')
+            rid += 1
+        prev_dt = curr_dt
+        rid += 1
+
+
+def add_missing_data():
+    
+    # connect and get current content
+    client, doc, sheet = get_client()
+    content = read_sheet()
+    
+    # compile list of cells to update at-once
+    to_update = []
+    for ii in range(len(content)):
+        row = content.iloc[ii]
+        rid = ii + 2
+        
+        # update day-of-week?
+        if pd.isnull(row['DAY-OF-WEEK']):
+            dt = datetime.strptime(row['DATE'], '%Y-%m-%d')
+            dow = dt.strftime('%A')
+            cell = gspread.models.Cell(rid, cid['DAY-OF-WEEK'], dow)
+            to_update.append(cell)
+        
+        # update weather?
+        if pd.isnull(row['AIR-TEMPERATURE-DEGREES-F']):
+            # get time
+            dt = dateutil.parser.parse(row['DATE'] + ' ' + row['TIME']) 
+            dt = dt.replace(tzinfo=US_EASTERN)
+            # fetch weather at time
+            
+        
+    # update all at once
+    if to_update:
+        sheet.update_cells(to_update, 'USER_ENTERED')
+
+    return to_update
+
+
+def get_weather_conditions(lon, lat, dt, key_file=DARKSKY_KEY):
     """
     Retrieve forecast or observed weather conditions
     
@@ -56,6 +156,7 @@ def get_weather_conditions(key_file, lon, lat, dt):
         lat: latitude of a location (in decimal degrees). Positive is north,
             negative is south.
         dt: datetime, timezone-aware, time for observation
+        key_file: JSON file containing Dark Sky API key
     
     Returns: Dict with the following fields (renamed from forecast.io):
         cloudCover: The percentage of sky occluded by clouds, between 0 and 1, inclusive.
@@ -93,40 +194,85 @@ def get_weather_conditions(key_file, lon, lat, dt):
         'windSpeed': 'WIND-SPEED-MPH',
         }
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
+
+    
+# def _populate_date_time():
+#     """Populate the date and time columns in the Google sheet - used once"""
+#     client, doc, sheet = get_client()
+#         
+#     # gather date parts from sheet
+#     year_col = sheet.find('YEAR').col
+#     years = sheet.col_values(year_col, 'UNFORMATTED_VALUE')
+#     month_col = sheet.find('MONTH').col
+#     months = sheet.col_values(month_col, 'UNFORMATTED_VALUE')
+#     day_col = sheet.find('DAY').col
+#     days = sheet.col_values(day_col, 'UNFORMATTED_VALUE')        
+# 
+#     # convert to formatted date and time
+#     dates = ['DATE']
+#     times = ['TIME']
+#     for yy, mm, dd in zip(years[1:], months[1:], days[1:]):
+#         dt = datetime(yy, mm, dd, 7, 30, tzinfo=US_EASTERN)
+#         dates.append(dt.strftime('%Y-%m-%d'))
+#         times.append(dt.strftime('%H:%M %p'))
+#     
+#     # update sheet
+#     sheet.add_cols(2)
+#     date_col = sheet.col_count + 1
+#     time_col = sheet.col_count + 2
+#     
+#     date_cells = sheet.range(1, date_col, len(dates), date_col)
+#     for date, date_cell in zip(dates, date_cells):
+#         date_cell.value = date
+#     sheet.update_cells(date_cells, 'USER_ENTERED')
+#     
+#     time_cells = sheet.range(1, time_col, len(times), time_col)
+#     for time, time_cell in zip(times, time_cells):
+#         time_cell.value = time
+#     sheet.update_cells(time_cells, 'USER_ENTERED')
+#     
+#   return date_cells, time_cells
+
+
+
     
 def get_water_conditions():
     """
-    Retrieve observed water conditions
+    Retrieve observed water conditions at specified time
+    
+    Loads data from local pickle file, if available, else downloads from NOAA
+    parses to a dataframe, and pickles it.
+    
+    Data come from the nearest NOAA station as historical and realtime (last
+    45 days) datasets, formatted as tabular text files, see:
+        http://www.ndbc.noaa.gov/station_page.php?station=44020
     
     Arguments:
-        ?
+        dt: datetime, timezone aware, observation time
     
-    Returns:
-        ?
+    Returns: dict with the following fields:
+        ...
     """
-    pass
+    if os.path.isfile(N_PICKLE):
+        raise NotImplementedError
+    
+    # download historical data
+    
+# http://www.nws.noaa.gov/om/marine/internet.htm
+#  http://tgftp.nws.noaa.gov/data/forecasts/marine/coastal/an/anz233.txt    
+    
+# resp = requests.get('http://marine.weather.gov/MapClick.php?lat=41.4378&lon=-70.771&FcstType=digitalDWML')
 
 
-def sheets_get_client(key_file):
-    """Return authenticated client for Google Sheets"""
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
-    client = gspread.authorize(creds)
-    return client
+# http://www.ndbc.noaa.gov/rt_data_access.shtml
+# 'http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt'    
 
-
-def sheets_read_data():
-    """
-    Read attendence data from Google Sheets
-
-    Return: pd dataframe containing current data
-    """
-    client = sheets_get_client(GOOGLE_KEY_FILE)
-    doc = client.open(GOOGLE_DOC_TITLE)
-    sheet = doc.worksheet(GOOGLE_SHEET_ATTEND_TITLE)
-    content = sheet.get_all_records(default_blank=nan)
-    return pd.DataFrame(content)
+# http://www.ndbc.noaa.gov/station_page.php?station=BZBM3
+# http://www.ndbc.noaa.gov/station_realtime.php?station=BZBM3
+# http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt
+# http://www.ndbc.noaa.gov/measdes.shtml#stdmet
+# http://www.ndbc.noaa.gov/station_history.php?station=bzbm3
+# http://www.ndbc.noaa.gov/data/historical/stdmet/bzbm3h2017.txt.gz
 
 
 def add_dates(data):
