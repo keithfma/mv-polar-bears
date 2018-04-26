@@ -17,14 +17,19 @@ from datetime import datetime, timedelta
 import json
 import math
 import dateutil
+from pdb import set_trace
+import logging
+from time import sleep
 
 
 # config constants
 GOOGLE_KEY = 'google_secret.json'
 DOC_TITLE = 'MV Polar Bears'
-SHEET_TITLE = 'Data'
+SHEET_TITLE = 'Debug'
 DARKSKY_KEY = 'darksky_secret.json'
 NDBC_STATION = '44020' # Buoy in Nantucket Sound
+LOG_LEVEL = logging.INFO
+GOOGLE_WAIT_SEC = 60
 
 # physical constants
 INKWELL_LAT = 41.452463 # degrees N
@@ -37,9 +42,19 @@ NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '20pt'
 DAY_TO_MSEC = 60*60*24*1000
 
+# status codes
+SUCCESS = 0            # completed successfully, hooray!
+GOOGLE_QUOTA_ERROR = 1 #  Google API read / write quota exceeded
+
 # webpage constants
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
+
+
+# init logging
+logging.basicConfig(level=LOG_LEVEL)
+logger = logging.getLogger('mv-polar-bears')
+logger.setLevel(LOG_LEVEL)
 
 
 def get_client(key_file=GOOGLE_KEY, doc_title=DOC_TITLE, sheet_title=SHEET_TITLE):
@@ -65,15 +80,33 @@ def get_client(key_file=GOOGLE_KEY, doc_title=DOC_TITLE, sheet_title=SHEET_TITLE
     return client, doc, sheet
 
 
-def read_sheet():
+def read_sheet(sheet):
     """
     Read current data from Google Sheets
 
+    Arguments:
+        sheet: gspread sheet, connected
+
     Return: pd dataframe containing current data
     """
-    client, doc, sheet = get_client()
     content = sheet.get_all_records(default_blank=nan)
-    return pd.DataFrame(content)
+    content = pd.DataFrame(content)
+    logger.info('Read sheet contents')
+    return content
+
+
+def get_column_indices(sheet, base=0):
+    """
+    Return lookup table {column name: column index}
+    
+    Arguments:
+        sheet: gspread sheet, connected
+        base: 0 or 1, index of first column
+    
+    Return: lookup table
+    """
+    hdr = sheet.row_values(1)
+    return {name: ii+base for ii, name in enumerate(hdr)}
 
 
 def _parse_datetime(date_str, time_str):
@@ -83,14 +116,34 @@ def _parse_datetime(date_str, time_str):
     return dt    
 
 
-def add_missing_days():
-    """Add (empty) rows in sheet for missing days"""
+def _is_google_quota_error(err):
+    """Return True if input 'err' is a Google quota error, else False"""
+    tf = False
+    if isinstance(err, gspread.exceptions.APIError):
+        msg = err.response.json()['error']
+        code = msg['code']
+        status = msg['status']
+        if  code == 429 and status == 'RESOURCE_EXHAUSTED':
+            tf = True
+    return tf
+
+
+def add_missing_days(sheet):
+    """
+    Add (empty) rows in sheet for missing days
     
-    # connect and get current content
-    client, doc, sheet = get_client()
-    content = read_sheet()
-    cid = {x: ii + 1 for ii, x in enumerate(content.columns)}
-    
+    Arguments:
+        sheet: gspread sheet, connected
+
+    Return: exit status code, possible values are:
+        SUCCESS: completed successfully, hooray!
+        GOOGLE_QUOTA_ERROR: Google API read / write quota exceeded
+    """
+
+    # get current content
+    content = read_sheet(sheet)
+    col2ind = get_column_indices(sheet, base=0)
+
     # ensure minimum daily frequency by adding empty rows as needed
     rid = 3 # 1-based index to google sheet row
     prev_dt = _parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
@@ -99,14 +152,26 @@ def add_missing_days():
         curr_dt = _parse_datetime(content.iloc[ii]['DATE'], content.iloc[ii]['TIME'])
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
+            # build row
             day = prev_dt + timedelta(days=jj + 1)
-            row_values = [nan] * len(content.columns)
-            row_values[cid['DATE']] = day.strftime('%Y-%m-%d')
-            row_values[cid['TIME']] = day.strftime('%H:%M %p')
-            sheet.insert_row(row_values, rid, 'USER_ENTERED')
+            row_values = [None] * len(content.columns)
+            row_values[col2ind['DATE']] = day.strftime('%Y-%m-%d')
+            row_values[col2ind['TIME']] = day.strftime('%H:%M %p')
+            # update sheet, handling inevitable quota error
+            try:
+                sheet.insert_row(row_values, rid, 'USER_ENTERED')
+            except Exception as err:
+                if _is_google_quota_error(err):
+                    return GOOGLE_QUOTA_ERROR
+                else:
+                    raise err
+            # prepare for next
+            logger.info('Added row for {} at index {}'.format(day, rid))
             rid += 1
         prev_dt = curr_dt
         rid += 1
+
+    return SUCCESS
 
 
 def add_missing_data():
@@ -441,12 +506,26 @@ def build_site():
 
 
 # TODO: write command-line wrapper for build_site
+# TODO: write function for update_data
+# TODO: write command-line wrapper for update_data
 
 
 # DEBUG / TESTING
 if __name__ == '__main__':
 
-    current_time = datetime.now(US_EASTERN) - timedelta(days=50)
+    # working on an "update data" function
+    client, doc, sheet = get_client() 
     
-    data = get_weather_conditions(
-        DARKSKY_KEY_FILE, INKWELL_LON, INKWELL_LAT, current_time)
+    # TODO: write a generic wrapper to handle restarting
+    while True:
+        status = add_missing_days(sheet)
+        if status == SUCCESS:
+            break
+        elif status == GOOGLE_QUOTA_ERROR:
+            logger.warning('Google quota exhausted, waiting {} seconds'.format(GOOGLE_WAIT_SEC))
+            sleep(GOOGLE_WAIT_SEC)
+
+    # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
+    
+    # data = get_weather_conditions(
+    #     DARKSKY_KEY_FILE, INKWELL_LON, INKWELL_LAT, current_time)
