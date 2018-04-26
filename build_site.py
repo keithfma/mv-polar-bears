@@ -134,8 +134,15 @@ def add_missing_days(sheet):
     prev_dt = _parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
     for ii in range(1, len(content)): # index to local copy
         row = content.iloc[ii]
-        # TODO: handle case where first col is empty (happens after API errors sometimes) 
-        curr_dt = _parse_datetime(content.iloc[ii]['DATE'], content.iloc[ii]['TIME'])
+
+        # delete empty rows, they are sometime created by API errors
+        if all(pd.isnull(row)):
+            sheet.delete_row(rid)
+            logger.warning('Deleted empty row, index {}'.format(rid))
+            continue
+
+        # check for gap and fill it
+        curr_dt = _parse_datetime(row['DATE'], row['TIME'])
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
             day = prev_dt + timedelta(days=jj + 1)
@@ -145,6 +152,8 @@ def add_missing_days(sheet):
             sheet.insert_row(row_values, rid, 'USER_ENTERED')
             logger.info('Added row for {} at index {}'.format(day, rid))
             rid += 1
+        
+        # proceed to next row
         prev_dt = curr_dt
         rid += 1
 
