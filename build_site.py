@@ -50,7 +50,6 @@ GOOGLE_QUOTA_ERROR = 1 #  Google API read / write quota exceeded
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
 
-
 # init logging
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger('mv-polar-bears')
@@ -116,18 +115,6 @@ def _parse_datetime(date_str, time_str):
     return dt    
 
 
-def _is_google_quota_error(err):
-    """Return True if input 'err' is a Google quota error, else False"""
-    tf = False
-    if isinstance(err, gspread.exceptions.APIError):
-        msg = err.response.json()['error']
-        code = msg['code']
-        status = msg['status']
-        if  code == 429 and status == 'RESOURCE_EXHAUSTED':
-            tf = True
-    return tf
-
-
 def add_missing_days(sheet):
     """
     Add (empty) rows in sheet for missing days
@@ -135,9 +122,7 @@ def add_missing_days(sheet):
     Arguments:
         sheet: gspread sheet, connected
 
-    Return: exit status code, possible values are:
-        SUCCESS: completed successfully, hooray!
-        GOOGLE_QUOTA_ERROR: Google API read / write quota exceeded
+    Return: exit status code, possible values are SUCCESS, GOOGLE_QUOTA_ERROR
     """
 
     # get current content
@@ -149,23 +134,15 @@ def add_missing_days(sheet):
     prev_dt = _parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
     for ii in range(1, len(content)): # index to local copy
         row = content.iloc[ii]
+        # TODO: handle case where first col is empty (happens after API errors sometimes) 
         curr_dt = _parse_datetime(content.iloc[ii]['DATE'], content.iloc[ii]['TIME'])
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
-            # build row
             day = prev_dt + timedelta(days=jj + 1)
             row_values = [None] * len(content.columns)
             row_values[col2ind['DATE']] = day.strftime('%Y-%m-%d')
             row_values[col2ind['TIME']] = day.strftime('%H:%M %p')
-            # update sheet, handling inevitable quota error
-            try:
-                sheet.insert_row(row_values, rid, 'USER_ENTERED')
-            except Exception as err:
-                if _is_google_quota_error(err):
-                    return GOOGLE_QUOTA_ERROR
-                else:
-                    raise err
-            # prepare for next
+            sheet.insert_row(row_values, rid, 'USER_ENTERED')
             logger.info('Added row for {} at index {}'.format(day, rid))
             rid += 1
         prev_dt = curr_dt
@@ -510,20 +487,51 @@ def build_site():
 # TODO: write command-line wrapper for update_data
 
 
+def _is_google_quota_error(err):
+    """Return True if input 'err' is a Google quota error, else False"""
+    tf = False
+    if isinstance(err, gspread.exceptions.APIError):
+        msg = err.response.json()['error']
+        code = msg['code']
+        status = msg['status']
+        if  code == 429 and status == 'RESOURCE_EXHAUSTED':
+            tf = True
+    return tf
+
+
+def retry_until_success(func, *args):
+    """
+    Run function until it completes successfully, handling API rate errors
+
+    Arguments:
+        func: callable, function to be run
+        *args: arbitrary arguments to func
+    """
+    while True:
+        try: 
+            # attempt to run function
+            func(*args)
+        except Exception as err:
+            if _is_google_quota_error(err):
+                # handle rate error, retry after delay
+                msg = 'Google quota exhausted, waiting {}s'.format(GOOGLE_WAIT_SEC)
+                logger.warning(msg)
+                sleep(GOOGLE_WAIT_SEC)
+                continue
+            else:
+                # some other error, fail
+                raise err
+        # completed without error
+        break 
+
+
 # DEBUG / TESTING
 if __name__ == '__main__':
 
     # working on an "update data" function
     client, doc, sheet = get_client() 
     
-    # TODO: write a generic wrapper to handle restarting
-    while True:
-        status = add_missing_days(sheet)
-        if status == SUCCESS:
-            break
-        elif status == GOOGLE_QUOTA_ERROR:
-            logger.warning('Google quota exhausted, waiting {} seconds'.format(GOOGLE_WAIT_SEC))
-            sleep(GOOGLE_WAIT_SEC)
+    retry_until_success(add_missing_days, sheet)
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
