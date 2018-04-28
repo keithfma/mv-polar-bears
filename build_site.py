@@ -52,7 +52,17 @@ logger = logging.getLogger('mv-polar-bears')
 logger.setLevel(LOG_LEVEL)
 
 
-def _is_google_quota_error(err):
+# utilities ------------------------------------------------------------------
+
+
+def parse_datetime(date_str, time_str):
+    """Utility for parsing DATE and TIME columns to python datetime"""
+    dt = dateutil.parser.parse(date_str + ' ' + time_str) 
+    dt = dt.replace(tzinfo=US_EASTERN)
+    return dt    
+
+
+def is_google_quota_error(err):
     """Return True if input 'err' is a Google quota error, else False"""
     tf = False
     if isinstance(err, gspread.exceptions.APIError):
@@ -85,7 +95,7 @@ def api(func):
             except Exception as err:
                 # handle known exceptions
 
-                if _is_google_quota_error(err):
+                if is_google_quota_error(err):
                     # handle google rate error, retry after delay
                     msg = 'Google quota exhausted, waiting {}s'.format(GOOGLE_WAIT_SEC)
                     logger.warning(msg)
@@ -154,11 +164,7 @@ def get_column_indices(sheet, base=0):
     return {name: ii+base for ii, name in enumerate(hdr)}
 
 
-def _parse_datetime(date_str, time_str):
-    """Utility for parsing DATE and TIME columns to python datetime"""
-    dt = dateutil.parser.parse(date_str + ' ' + time_str) 
-    dt = dt.replace(tzinfo=US_EASTERN)
-    return dt    
+# data update ----------------------------------------------------------------
 
 
 @api
@@ -176,7 +182,7 @@ def add_missing_days(sheet):
 
     # ensure minimum daily frequency by adding empty rows as needed
     rid = 3 # 1-based index to google sheet row
-    prev_dt = _parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
+    prev_dt = parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
     for ii in range(1, len(content)): # index to local copy
         row = content.iloc[ii]
 
@@ -187,7 +193,7 @@ def add_missing_days(sheet):
             continue
 
         # check for gap and fill it
-        curr_dt = _parse_datetime(row['DATE'], row['TIME'])
+        curr_dt = parse_datetime(row['DATE'], row['TIME'])
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
             day = prev_dt + timedelta(days=jj + 1)
@@ -201,6 +207,38 @@ def add_missing_days(sheet):
         # proceed to next row
         prev_dt = curr_dt
         rid += 1
+
+
+@api
+def add_missing_dows(sheet):
+    """
+    Populate missing day-of-week cells
+
+    Arguments:
+        sheet: gspread sheet, connected
+    """
+    # get current content
+    content = read_sheet(sheet)
+
+    # find col to update
+    sheet_col_idx = get_column_indices(sheet, base=1)['DAY-OF-WEEK']
+
+    # compile list of cells to update at-once
+    to_update = []
+    for ii in range(len(content)):
+        row = content.iloc[ii]
+        if pd.isnull(row['DAY-OF-WEEK']):
+            dt = parse_datetime(row['DATE'], row['TIME'])
+            dow = dt.strftime('%A')
+            sheet_row_idx = ii + 2 # index in sheet, 1-based with header
+            cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, dow)
+            to_update.append(cell)
+            logger.info('Queue add day-of-week {} -> {}'.format(dt, dow))
+
+    # update all at once
+    if to_update:
+        sheet.update_cells(to_update, 'USER_ENTERED')
+        logger.info('Updated day-of-week for {} rows'.format(len(to_update)))
 
 
 def add_missing_data():
@@ -543,7 +581,8 @@ def build_site():
 if __name__ == '__main__':
 
     client, doc, sheet = get_client() 
-    add_missing_days(sheet)
+    # add_missing_days(sheet)
+    add_missing_dows(sheet)
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
