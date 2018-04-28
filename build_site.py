@@ -241,6 +241,7 @@ def add_missing_dows(sheet):
         logger.info('Updated day-of-week for {} rows'.format(len(to_update)))
 
 
+@api
 def add_missing_weather(sheet):
     """
     Populate missing weather cells
@@ -249,39 +250,41 @@ def add_missing_weather(sheet):
         sheet: gspread sheet, connected
 
     """
+    # constants
+    weather_col_names = [
+        'CLOUD-COVER-PERCENT', 'HUMIDITY-PERCENT', 'PRECIP-RATE-INCHES-PER-HOUR',
+        'PRECIP-PROBABILITY', 'WEATHER-SUMMARY', 'AIR-TEMPERATURE-DEGREES-F',
+        'WIND-BEARING-CW-DEGREES-FROM-N', 'WIND-GUST-SPEED-MPH',
+        'WIND-SPEED-MPH']     
+    col_idxs = get_column_indices(sheet, base=1)
 
-def add_missing_data():
-    
-    # connect and get current content
-    client, doc, sheet = get_client()
-    content = read_sheet()
-    
+    # get current content
+    content = read_sheet(sheet)
+
     # compile list of cells to update at-once
     to_update = []
     for ii in range(len(content)):
         row = content.iloc[ii]
-        rid = ii + 2
-        
-        # update day-of-week?
-        if pd.isnull(row['DAY-OF-WEEK']):
-            dt = datetime.strptime(row['DATE'], '%Y-%m-%d')
-            dow = dt.strftime('%A')
-            cell = gspread.models.Cell(rid, cid['DAY-OF-WEEK'], dow)
-            to_update.append(cell)
-        
-        # update weather?
-        if pd.isnull(row['AIR-TEMPERATURE-DEGREES-F']):
-            # get time
-            dt = dateutil.parser.parse(row['DATE'] + ' ' + row['TIME']) 
-            dt = dt.replace(tzinfo=US_EASTERN)
-            # fetch weather at time
-            
-        
+        if any(pd.isnull(row[weather_col_names])):
+            # get weather
+            dt = parse_datetime(row['DATE'], row['TIME'])
+            weather_data = get_weather_conditions(dt=dt)
+            # queue update for all missing cells
+            sheet_row_idx = ii + 2 # index in sheet, 1-based with header
+            for col_name in weather_col_names:
+                sheet_col_idx = col_idxs[col_name]
+                new_value = weather_data[col_name]
+                cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, new_value)
+                to_update.append(cell)
+                logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
+
+        if ii > 2:
+            break
+
     # update all at once
     if to_update:
         sheet.update_cells(to_update, 'USER_ENTERED')
-
-    return to_update
+        logger.info('Updated weather data {} cells'.format(len(to_update)))
 
 
 def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=DARKSKY_KEY):
@@ -304,21 +307,20 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
         CLOUD-COVER-PERCENT: The percentage of sky occluded by clouds, between
             0 and 1, inclusive.
         HUMIDITY-PERCENT: The relative humidity, between 0 and 1, inclusive.
-        PRECIP-RATE-INCHES-PER-HR: The intensity (in inches of liquid water per
+        PRECIP-RATE-INCHES-PER-HOUR: The intensity (in inches of liquid water per
             hour) of precipitation occurring at the given time. This value is
             conditional on probability (that is, assuming any precipitation
             occurs at all) for minutely data points, and unconditional
             otherwise.
         PRECIP-PROBABILITY: The probability of precipitation occurring, between
             0 and 1, inclusive.
-        SUMMARY: A human-readable text summary of this data point.
+        WEATHER-SUMMARY: A human-readable text summary of this data point.
         AIR-TEMPERATURE-DEGREES-F: The air temperature in degrees Fahrenheit.
         WIND-BEARING-CW-DEGREES-FROM-N: The direction that the wind is coming
             from in degrees, with true north at 0° and progressing clockwise.
             (If windSpeed is zero, then this value will not be defined.)
         WIND-GUST-SPEED-MPH: The wind gust speed in miles per hour.
         WIND-SPEED-MPH: The wind speed in miles per hour.
-        ...
     """
     # set defaults
     if not dt:
@@ -339,9 +341,9 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
     fields = {  # forecast.io names -> local names
         'cloudCover': 'CLOUD-COVER-PERCENT',
         'humidity': 'HUMIDITY-PERCENT',
-        'precipIntensity': 'PRECIP-RATE-INCHES-PER-HR',
+        'precipIntensity': 'PRECIP-RATE-INCHES-PER-HOUR',
         'precipProbability': 'PRECIP-PROBABILITY',
-        'summary': 'SUMMARY',
+        'summary': 'WEATHER-SUMMARY',
         'temperature': 'AIR-TEMPERATURE-DEGREES-F',
         'windBearing': 'WIND-BEARING-CW-DEGREES-FROM-N',
         'windGust': 'WIND-GUST-SPEED-MPH',
@@ -606,7 +608,7 @@ if __name__ == '__main__':
     client, doc, sheet = get_client() 
     # add_missing_days(sheet)
     # add_missing_dows(sheet)
-    data = get_weather_conditions()
+    add_missing_weather(sheet)
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
