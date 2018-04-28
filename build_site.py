@@ -42,10 +42,6 @@ NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '20pt'
 DAY_TO_MSEC = 60*60*24*1000
 
-# status codes
-SUCCESS = 0            # completed successfully, hooray!
-GOOGLE_QUOTA_ERROR = 1 #  Google API read / write quota exceeded
-
 # webpage constants
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
@@ -54,6 +50,56 @@ PUBLISH_DIR = 'docs'
 logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger('mv-polar-bears')
 logger.setLevel(LOG_LEVEL)
+
+
+def _is_google_quota_error(err):
+    """Return True if input 'err' is a Google quota error, else False"""
+    tf = False
+    if isinstance(err, gspread.exceptions.APIError):
+        msg = err.response.json()['error']
+        code = msg['code']
+        status = msg['status']
+        if  code == 429 and status == 'RESOURCE_EXHAUSTED':
+            tf = True
+    return tf
+
+
+def api(func):
+    """
+    Wrap input function to handle known API issues (e.g., rate limits, errors)
+
+    Arguments:
+        func: callable, to be wrapped and returned
+
+    Returns: callable, wrapped version of func that handles API issues
+    """
+
+    def wrapper(*args, **kwargs):
+        while True:
+            # retry until some condition breaks the loop
+            
+            try: 
+                # attempt to run function
+                func(*args, **kwargs)
+            
+            except Exception as err:
+                # handle known exceptions
+
+                if _is_google_quota_error(err):
+                    # handle google rate error, retry after delay
+                    msg = 'Google quota exhausted, waiting {}s'.format(GOOGLE_WAIT_SEC)
+                    logger.warning(msg)
+                    sleep(GOOGLE_WAIT_SEC)
+                    continue
+                
+                else:
+                    # some other error, fail
+                    raise err
+            
+            # completed without error
+            break
+        
+    return wrapper
 
 
 def get_client(key_file=GOOGLE_KEY, doc_title=DOC_TITLE, sheet_title=SHEET_TITLE):
@@ -115,14 +161,13 @@ def _parse_datetime(date_str, time_str):
     return dt    
 
 
+@api
 def add_missing_days(sheet):
     """
     Add (empty) rows in sheet for missing days
     
     Arguments:
         sheet: gspread sheet, connected
-
-    Return: exit status code, possible values are SUCCESS, GOOGLE_QUOTA_ERROR
     """
 
     # get current content
@@ -156,8 +201,6 @@ def add_missing_days(sheet):
         # proceed to next row
         prev_dt = curr_dt
         rid += 1
-
-    return SUCCESS
 
 
 def add_missing_data():
@@ -496,51 +539,11 @@ def build_site():
 # TODO: write command-line wrapper for update_data
 
 
-def _is_google_quota_error(err):
-    """Return True if input 'err' is a Google quota error, else False"""
-    tf = False
-    if isinstance(err, gspread.exceptions.APIError):
-        msg = err.response.json()['error']
-        code = msg['code']
-        status = msg['status']
-        if  code == 429 and status == 'RESOURCE_EXHAUSTED':
-            tf = True
-    return tf
-
-
-def retry_until_success(func, *args):
-    """
-    Run function until it completes successfully, handling API rate errors
-
-    Arguments:
-        func: callable, function to be run
-        *args: arbitrary arguments to func
-    """
-    while True:
-        try: 
-            # attempt to run function
-            func(*args)
-        except Exception as err:
-            if _is_google_quota_error(err):
-                # handle rate error, retry after delay
-                msg = 'Google quota exhausted, waiting {}s'.format(GOOGLE_WAIT_SEC)
-                logger.warning(msg)
-                sleep(GOOGLE_WAIT_SEC)
-                continue
-            else:
-                # some other error, fail
-                raise err
-        # completed without error
-        break 
-
-
 # DEBUG / TESTING
 if __name__ == '__main__':
 
-    # working on an "update data" function
     client, doc, sheet = get_client() 
-    
-    retry_until_success(add_missing_days, sheet)
+    add_missing_days(sheet)
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
