@@ -241,6 +241,15 @@ def add_missing_dows(sheet):
         logger.info('Updated day-of-week for {} rows'.format(len(to_update)))
 
 
+def add_missing_weather(sheet):
+    """
+    Populate missing weather cells
+
+    Arguments:
+        sheet: gspread sheet, connected
+
+    """
+
 def add_missing_data():
     
     # connect and get current content
@@ -275,7 +284,7 @@ def add_missing_data():
     return to_update
 
 
-def get_weather_conditions(lon, lat, dt, key_file=DARKSKY_KEY):
+def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=DARKSKY_KEY):
     """
     Retrieve forecast or observed weather conditions
     
@@ -284,24 +293,37 @@ def get_weather_conditions(lon, lat, dt, key_file=DARKSKY_KEY):
     
     Arguments:
         lon: longitude of a location (in decimal degrees). Positive is east,
-            negative is west
+            negative is west, default is Inkwell beach, Oak Bluffs
         lat: latitude of a location (in decimal degrees). Positive is north,
-            negative is south.
-        dt: datetime, timezone-aware, time for observation
+            negative is south, default is Inkwell beach, Oak Bluffs
+        dt: datetime, timezone-aware, time for observation, default is now in
+            US/Eastern timezone
         key_file: JSON file containing Dark Sky API key
     
     Returns: Dict with the following fields (renamed from forecast.io):
-        cloudCover: The percentage of sky occluded by clouds, between 0 and 1, inclusive.
-        humidity: The relative humidity, between 0 and 1, inclusive.
-        precipIntensity: The intensity (in inches of liquid water per hour) of precipitation occurring at the given time. This value is conditional on probability (that is, assuming any precipitation occurs at all) for minutely data points, and unconditional otherwise.
-        precipProbability: The probability of precipitation occurring, between 0 and 1, inclusive.
-        summary: A human-readable text summary of this data point.
-        temperature: The air temperature in degrees Fahrenheit.
-        windBearing: The direction that the wind is coming from in degrees, with true north at 0° and progressing clockwise. (If windSpeed is zero, then this value will not be defined.)
-        windGust: The wind gust speed in miles per hour.
-        windSpeed: The wind speed in miles per hour.
+        CLOUD-COVER-PERCENT: The percentage of sky occluded by clouds, between
+            0 and 1, inclusive.
+        HUMIDITY-PERCENT: The relative humidity, between 0 and 1, inclusive.
+        PRECIP-RATE-INCHES-PER-HR: The intensity (in inches of liquid water per
+            hour) of precipitation occurring at the given time. This value is
+            conditional on probability (that is, assuming any precipitation
+            occurs at all) for minutely data points, and unconditional
+            otherwise.
+        PRECIP-PROBABILITY: The probability of precipitation occurring, between
+            0 and 1, inclusive.
+        SUMMARY: A human-readable text summary of this data point.
+        AIR-TEMPERATURE-DEGREES-F: The air temperature in degrees Fahrenheit.
+        WIND-BEARING-CW-DEGREES-FROM-N: The direction that the wind is coming
+            from in degrees, with true north at 0° and progressing clockwise.
+            (If windSpeed is zero, then this value will not be defined.)
+        WIND-GUST-SPEED-MPH: The wind gust speed in miles per hour.
+        WIND-SPEED-MPH: The wind speed in miles per hour.
         ...
     """
+    # set defaults
+    if not dt:
+        dt = datetime.now(tz=US_EASTERN)
+
     # request data from Dark Sky API (e.g. forecast.io)
     with open(key_file, 'r') as fp:
         key = json.load(fp)['secret_key']
@@ -325,6 +347,7 @@ def get_weather_conditions(lon, lat, dt, key_file=DARKSKY_KEY):
         'windGust': 'WIND-GUST-SPEED-MPH',
         'windSpeed': 'WIND-SPEED-MPH',
         }
+
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
 
     
@@ -582,7 +605,8 @@ if __name__ == '__main__':
 
     client, doc, sheet = get_client() 
     # add_missing_days(sheet)
-    add_missing_dows(sheet)
+    # add_missing_dows(sheet)
+    data = get_weather_conditions()
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
