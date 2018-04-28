@@ -353,46 +353,6 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
 
     
-# def _populate_date_time():
-#     """Populate the date and time columns in the Google sheet - used once"""
-#     client, doc, sheet = get_client()
-#         
-#     # gather date parts from sheet
-#     year_col = sheet.find('YEAR').col
-#     years = sheet.col_values(year_col, 'UNFORMATTED_VALUE')
-#     month_col = sheet.find('MONTH').col
-#     months = sheet.col_values(month_col, 'UNFORMATTED_VALUE')
-#     day_col = sheet.find('DAY').col
-#     days = sheet.col_values(day_col, 'UNFORMATTED_VALUE')        
-# 
-#     # convert to formatted date and time
-#     dates = ['DATE']
-#     times = ['TIME']
-#     for yy, mm, dd in zip(years[1:], months[1:], days[1:]):
-#         dt = datetime(yy, mm, dd, 7, 30, tzinfo=US_EASTERN)
-#         dates.append(dt.strftime('%Y-%m-%d'))
-#         times.append(dt.strftime('%H:%M %p'))
-#     
-#     # update sheet
-#     sheet.add_cols(2)
-#     date_col = sheet.col_count + 1
-#     time_col = sheet.col_count + 2
-#     
-#     date_cells = sheet.range(1, date_col, len(dates), date_col)
-#     for date, date_cell in zip(dates, date_cells):
-#         date_cell.value = date
-#     sheet.update_cells(date_cells, 'USER_ENTERED')
-#     
-#     time_cells = sheet.range(1, time_col, len(times), time_col)
-#     for time, time_cell in zip(times, time_cells):
-#         time_cell.value = time
-#     sheet.update_cells(time_cells, 'USER_ENTERED')
-#     
-#   return date_cells, time_cells
-
-
-
-    
 def get_water_conditions():
     """
     Retrieve observed water conditions at specified time
@@ -415,21 +375,20 @@ def get_water_conditions():
     
     # download historical data
     
-# http://www.nws.noaa.gov/om/marine/internet.htm
-#  http://tgftp.nws.noaa.gov/data/forecasts/marine/coastal/an/anz233.txt    
-    
-# resp = requests.get('http://marine.weather.gov/MapClick.php?lat=41.4378&lon=-70.771&FcstType=digitalDWML')
+    # http://www.nws.noaa.gov/om/marine/internet.htm
+    # http://tgftp.nws.noaa.gov/data/forecasts/marine/coastal/an/anz233.txt    
+    # resp = requests.get('http://marine.weather.gov/MapClick.php?lat=41.4378&lon=-70.771&FcstType=digitalDWML')
+    # http://www.ndbc.noaa.gov/rt_data_access.shtml
+    # http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt    
+    # http://www.ndbc.noaa.gov/station_page.php?station=BZBM3
+    # http://www.ndbc.noaa.gov/station_realtime.php?station=BZBM3
+    # http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt
+    # http://www.ndbc.noaa.gov/measdes.shtml#stdmet
+    # http://www.ndbc.noaa.gov/station_history.php?station=bzbm3
+    # http://www.ndbc.noaa.gov/data/historical/stdmet/bzbm3h2017.txt.gz
 
 
-# http://www.ndbc.noaa.gov/rt_data_access.shtml
-# 'http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt'    
-
-# http://www.ndbc.noaa.gov/station_page.php?station=BZBM3
-# http://www.ndbc.noaa.gov/station_realtime.php?station=BZBM3
-# http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt
-# http://www.ndbc.noaa.gov/measdes.shtml#stdmet
-# http://www.ndbc.noaa.gov/station_history.php?station=bzbm3
-# http://www.ndbc.noaa.gov/data/historical/stdmet/bzbm3h2017.txt.gz
+# update plots ---------------------------------------------------------------
 
 
 def add_dates(data):
@@ -608,7 +567,8 @@ if __name__ == '__main__':
     client, doc, sheet = get_client() 
     # add_missing_days(sheet)
     # add_missing_dows(sheet)
-    add_missing_weather(sheet)
+    # add_missing_weather(sheet)
+    data = get_water_conditions()
 
     # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
     
