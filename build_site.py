@@ -22,6 +22,7 @@ import logging
 from time import sleep
 import io
 import re
+import pickle
 
 
 # config constants
@@ -30,6 +31,8 @@ DOC_TITLE = 'MV Polar Bears'
 SHEET_TITLE = 'Debug'
 DARKSKY_KEY = 'darksky_secret.json'
 BUOY_NUM = '44020' # Buoy in Nantucket Sound
+BUOY_DIR = os.path.join('data', 'NDBC_Buoy_{}'.format(BUOY_NUM))
+BUOY_HISTORICAL = os.path.join(BUOY_DIR, 'historical.pkl')
 LOG_LEVEL = logging.INFO
 GOOGLE_WAIT_SEC = 60
 
@@ -570,7 +573,7 @@ if __name__ == '__main__':
     # add_missing_weather(sheet)
     # data = get_water_conditions()
 
-    dt = datetime.now(tz=US_EASTERN) - timedelta(days=20)
+    dt = datetime.now(tz=US_EASTERN) - timedelta(days=100)
 
     dt_utc = dt.astimezone(UTC)
     now_utc = datetime.now(tz=UTC)
@@ -578,32 +581,61 @@ if __name__ == '__main__':
     delta_days = (now_utc - dt_utc).days
 
     def to_datetime(row):
-        dt = datetime(year=row['YY'], month=row['MM'], day=row['DD'],
-                      hour=row['hh'], minute=row['mm'], tzinfo=UTC)
+        dt = datetime(year=round(row['YY']), month=round(row['MM']),
+                      day=round(row['DD']), hour=round(row['hh']),
+                      minute=round(row['mm']), tzinfo=UTC)
         return dt
+
+    def raw_to_dataframe(txt):
+        stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
+        data = pd.read_csv(stream, sep=' ', skiprows=[1])
+        data.replace('MM', nan)
+        return data
 
     if delta_days <= 5:
         # retrieve hourly data for past 5 days
         url = 'http://www.ndbc.noaa.gov/data/5day2/{}_5day.txt'.format(BUOY_NUM)
         resp = requests.get(url)
         resp.raise_for_status()
-        txt = resp.text
+        data = raw_to_dataframe(resp.text)
     
     elif delta_days <= 45:
         # retrieve hourly data for past 45 days
         url = 'http://www.ndbc.noaa.gov/data/realtime2/{}.txt'.format(BUOY_NUM)
         resp = requests.get(url)
         resp.raise_for_status()
-        txt = resp.text
+        data = raw_to_dataframe(resp.text)
 
     else:
         # retrieve historical data
-        pass
+        if os.path.isfile(BUOY_HISTORICAL):
+            # read cached pickle
+            with open(BUOY_HISTORICAL, 'rb') as fp:
+                data = pickle.load(fp)
+        
+        else:
+            # parse raw sources
+            sources = [
+                os.path.join(BUOY_DIR, '2014.txt'), 
+                os.path.join(BUOY_DIR, '2015.txt'),
+                os.path.join(BUOY_DIR, '2016.txt'),
+                os.path.join(BUOY_DIR, '2017.txt'),
+                os.path.join(BUOY_DIR, '2018-01.txt'),
+                os.path.join(BUOY_DIR, '2018-02.txt'),
+                os.path.join(BUOY_DIR, '2018-03.txt'),
+                ]
+            dfs = []
+            for src in sources:
+                with open(src, 'r') as fp:
+                    src_txt = fp.read()
+                dfs.append(raw_to_dataframe(src_txt))
+            data = dfs[0].append(dfs[1:])
+            data.reset_index(drop=True, inplace=True)
+            # cache as pickle
+            with open(BUOY_HISTORICAL, 'wb') as fp:
+                pickle.dump(data, fp)
 
     # convert to dataframe
-    stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
-    data = pd.read_csv(stream, sep=' ', skiprows=[1])
-    data.replace('MM', nan)
     
     # find the nearest record, should be within 2 hours
     data['DATETIME'] = data.apply(to_datetime, axis=1)
