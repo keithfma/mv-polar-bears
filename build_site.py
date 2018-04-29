@@ -23,6 +23,7 @@ from time import sleep
 import io
 import re
 import pickle
+import numpy as np
 
 
 # config constants
@@ -284,13 +285,55 @@ def add_missing_weather(sheet):
                 to_update.append(cell)
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
 
-        if ii > 2:
-            break
+    # update all at once
+    if to_update:
+        sheet.update_cells(to_update, 'USER_ENTERED')
+        logger.info('Updated weather conditions data in {} cells'.format(len(to_update)))
+
+
+@api
+def add_missing_water(sheet):
+    """
+    Populate missing water conditions cells
+
+    Arguments:
+        sheet: gspread sheet, connected
+
+    """
+    # constants
+    water_col_names = [
+        'WAVE-HEIGHT-METERS',
+        'DOMINANT-WAVE-PERIOD-SECONDS',
+        'AVERAGE-WAVE-PERIOD-SECONDS',
+        'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
+        'WATER-TEMPERATURE-DEGREES-C']
+        
+    col_idxs = get_column_indices(sheet, base=1)
+
+    # get current content
+    content = read_sheet(sheet)
+
+    # compile list of cells to update at-once
+    to_update = []
+    for ii in range(len(content)):
+        row = content.iloc[ii]
+        if any(pd.isnull(row[water_col_names])):
+            # get water conditions 
+            dt = parse_datetime(row['DATE'], row['TIME'])
+            water_data = get_water_conditions(dt=dt)
+            # queue update for all missing cells
+            sheet_row_idx = ii + 2 # index in sheet, 1-based with header
+            for col_name in water_col_names:
+                sheet_col_idx = col_idxs[col_name]
+                new_value = water_data[col_name]
+                cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, new_value)
+                to_update.append(cell)
+                logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
 
     # update all at once
     if to_update:
         sheet.update_cells(to_update, 'USER_ENTERED')
-        logger.info('Updated weather data {} cells'.format(len(to_update)))
+        logger.info('Updated water conditions data in {} cells'.format(len(to_update)))
 
 
 def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=DARKSKY_KEY):
@@ -404,6 +447,14 @@ def get_water_conditions(dt):
         data = pd.read_csv(stream, sep=' ', skiprows=[1])
         data.replace('MM', nan)
         return data
+    
+    def convert_type(val):
+        if isinstance(val, np.float64):
+            return float(val)
+        elif isinstance(val, np.int64):
+            return float(val)
+        else:
+            raise TypeError('Unhandled type conversion')
 
     # init times
     dt_utc = dt.astimezone(UTC)
@@ -468,7 +519,7 @@ def get_water_conditions(dt):
         'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
         'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
         }
-    return {v: rec[n] for n, v in fields.items()}
+    return {v: convert_type(rec[n]) for n, v in fields.items()}
 
 
 # update plots ---------------------------------------------------------------
@@ -647,16 +698,8 @@ def build_site():
 # DEBUG / TESTING
 if __name__ == '__main__':
 
-    # client, doc, sheet = get_client() 
+    client, doc, sheet = get_client() 
     # add_missing_days(sheet)
     # add_missing_dows(sheet)
     # add_missing_weather(sheet)
-    
-    dt = datetime.now(tz=US_EASTERN) - timedelta(days=1)
-    data = get_water_conditions(dt)
-
-
-
-
-
-
+    add_missing_water(sheet)
