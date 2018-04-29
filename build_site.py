@@ -20,6 +20,8 @@ import dateutil
 from pdb import set_trace
 import logging
 from time import sleep
+import io
+import re
 
 
 # config constants
@@ -35,6 +37,7 @@ GOOGLE_WAIT_SEC = 60
 INKWELL_LAT = 41.452463 # degrees N
 INKWELL_LON = -70.553526 # degrees E
 US_EASTERN = pytz.timezone('US/Eastern')
+UTC = pytz.timezone('UTC')
 
 # plot format constants
 GROUP_COLOR = 'royalblue'
@@ -349,7 +352,6 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
         'windGust': 'WIND-GUST-SPEED-MPH',
         'windSpeed': 'WIND-SPEED-MPH',
         }
-
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
 
     
@@ -370,8 +372,6 @@ def get_water_conditions():
     Returns: dict with the following fields:
         ...
     """
-    if os.path.isfile(N_PICKLE):
-        raise NotImplementedError
     
     # download historical data
     
@@ -564,13 +564,81 @@ def build_site():
 # DEBUG / TESTING
 if __name__ == '__main__':
 
-    client, doc, sheet = get_client() 
+    # client, doc, sheet = get_client() 
     # add_missing_days(sheet)
     # add_missing_dows(sheet)
     # add_missing_weather(sheet)
-    data = get_water_conditions()
+    # data = get_water_conditions()
 
-    # current_time = datetime.now(US_EASTERN) - timedelta(days=50)
+    dt = datetime.now(tz=US_EASTERN)
+
+    dt_utc = dt.astimezone(UTC)
+    now_utc = datetime.now(tz=UTC)
     
-    # data = get_weather_conditions(
-    #     DARKSKY_KEY_FILE, INKWELL_LON, INKWELL_LAT, current_time)
+    delta_days = (now_utc - dt_utc).days
+
+    def to_datetime(row):
+        dt = datetime(year=row['YY'], month=row['MM'], day=row['DD'],
+                      hour=row['hh'], minute=row['mm'], tzinfo=UTC)
+        return dt
+
+    if delta_days <= 5:
+        # retrieve hourly data for past 5 days
+        url = 'http://www.ndbc.noaa.gov/data/5day2/44020_5day.txt'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        txt = resp.text
+    
+    elif delta_days <= 45:
+        # retrieve hourly data for past 45 days
+        pass
+
+    else:
+        # retrieve historical data
+        pass
+
+    # convert to dataframe
+    stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
+    data = pd.read_csv(stream, sep=' ', skiprows=[1])
+    data.replace('MM', nan)
+    
+    # find the nearest record, should be within 2 hours
+    data['DATETIME'] = data.apply(to_datetime, axis=1)
+    time_diff = dt_utc - data['DATETIME']
+    idx = time_diff.idxmin()
+    rec = data.iloc[idx]
+    logger.info('Closest water conditions record is {} from specified time'.format(
+                time_diff.iloc[idx]))
+
+    docstring = """
+    WAVE-HEIGHT-METERS: Significant wave height (meters) is calculated as the
+        average of the highest one-third of all of the wave heights during the
+        20-minute sampling period. See the Wave Measurements section.
+    DOMINANT-WAVE-PERIOD-SECONDS: Dominant wave period (seconds) is the period
+        with the maximum wave energy. See the Wave Measurements section.
+    AVERAGE-WAVE-PERIOD-SECONDS: Average wave period (seconds) of all waves
+        during the 20-minute period. See the Wave Measurements section.
+    DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N: The direction from which the
+        waves at the dominant period (DPD) are coming. The units are degrees
+        from true North, increasing clockwise, with North as 0 (zero) degrees
+        and East as 90 degrees. See the Wave Measurements section.
+    WATER-TEMPERATIRE-DEGREES-C: Sea surface temperature (Celsius). For buoys
+        the depth is referenced to the hull's waterline. For fixed platforms it
+        varies with tide, but is referenced to, or near Mean Lower Low Water
+        (MLLW).
+    """
+     
+    # reformat resulting data
+    fields = {  # forecast.io names -> local names
+        'WVHT': 'WAVE-HEIGHT-METERS',
+        'DPD': 'DOMINANT-WAVE-PERIOD-SECONDS',
+        'APD': 'AVERAGE-WAVE-PERIOD-SECONDS',
+        'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
+        'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
+        }
+    
+    data_dict = {v: rec[n] for n, v in fields.items()}
+
+
+
+
