@@ -29,7 +29,7 @@ GOOGLE_KEY = 'google_secret.json'
 DOC_TITLE = 'MV Polar Bears'
 SHEET_TITLE = 'Debug'
 DARKSKY_KEY = 'darksky_secret.json'
-NDBC_STATION = '44020' # Buoy in Nantucket Sound
+BUOY_NUM = '44020' # Buoy in Nantucket Sound
 LOG_LEVEL = logging.INFO
 GOOGLE_WAIT_SEC = 60
 
@@ -570,7 +570,7 @@ if __name__ == '__main__':
     # add_missing_weather(sheet)
     # data = get_water_conditions()
 
-    dt = datetime.now(tz=US_EASTERN)
+    dt = datetime.now(tz=US_EASTERN) - timedelta(days=20)
 
     dt_utc = dt.astimezone(UTC)
     now_utc = datetime.now(tz=UTC)
@@ -584,14 +584,17 @@ if __name__ == '__main__':
 
     if delta_days <= 5:
         # retrieve hourly data for past 5 days
-        url = 'http://www.ndbc.noaa.gov/data/5day2/44020_5day.txt'
+        url = 'http://www.ndbc.noaa.gov/data/5day2/{}_5day.txt'.format(BUOY_NUM)
         resp = requests.get(url)
         resp.raise_for_status()
         txt = resp.text
     
     elif delta_days <= 45:
         # retrieve hourly data for past 45 days
-        pass
+        url = 'http://www.ndbc.noaa.gov/data/realtime2/{}.txt'.format(BUOY_NUM)
+        resp = requests.get(url)
+        resp.raise_for_status()
+        txt = resp.text
 
     else:
         # retrieve historical data
@@ -604,11 +607,11 @@ if __name__ == '__main__':
     
     # find the nearest record, should be within 2 hours
     data['DATETIME'] = data.apply(to_datetime, axis=1)
-    time_diff = dt_utc - data['DATETIME']
+    time_diff = abs(dt_utc - data['DATETIME'])
     idx = time_diff.idxmin()
     rec = data.iloc[idx]
-    logger.info('Closest water conditions record is {} from specified time'.format(
-                time_diff.iloc[idx]))
+    logger.info('Closest water conditions record to {} is {}'.format(
+                dt_utc, data.iloc[idx]['DATETIME']))
 
     docstring = """
     WAVE-HEIGHT-METERS: Significant wave height (meters) is calculated as the
