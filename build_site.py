@@ -329,10 +329,6 @@ def add_missing_water(sheet):
                 cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, new_value)
                 to_update.append(cell)
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
-        
-        # DEBUG
-        if ii > 10:
-            break
 
     # update all at once
     if to_update:
@@ -428,6 +424,35 @@ def _water_convert_type(val):
         raise TypeError('Unhandled type conversion')
 
     
+# retrieve historical water conditions data
+if os.path.isfile(BUOY_HISTORICAL):
+    # read cached pickle
+    with open(BUOY_HISTORICAL, 'rb') as fp:
+        water_historical_data = pickle.load(fp)
+else:
+    # parse raw sources
+    sources = [
+        os.path.join(BUOY_DIR, '2014.txt'), 
+        os.path.join(BUOY_DIR, '2015.txt'),
+        os.path.join(BUOY_DIR, '2016.txt'),
+        os.path.join(BUOY_DIR, '2017.txt'),
+        os.path.join(BUOY_DIR, '2018-01.txt'),
+        os.path.join(BUOY_DIR, '2018-02.txt'),
+        os.path.join(BUOY_DIR, '2018-03.txt'),
+        ]
+    dfs = []
+    for src in sources:
+        with open(src, 'r') as fp:
+            src_txt = fp.read()
+        dfs.append(_water_to_dataframe(src_txt))
+    water_historical_data = dfs[0].append(dfs[1:])
+    water_historical_data.reset_index(drop=True, inplace=True)
+    water_historical_data['DATETIME'] = water_historical_data.apply(_water_to_datetime, axis=1)
+    # cache as pickle
+    with open(BUOY_HISTORICAL, 'wb') as fp:
+        pickle.dump(water_historical_data, fp)
+
+
 def get_water_conditions(dt):
     """
     Retrieve observed water conditions at specified time
@@ -473,6 +498,7 @@ def get_water_conditions(dt):
         resp = requests.get(url)
         resp.raise_for_status()
         data = _water_to_dataframe(resp.text)
+        data['DATETIME'] = data.apply(_water_to_datetime, axis=1)
     
     elif delta_days <= 45:
         # retrieve hourly data for past 45 days
@@ -480,37 +506,12 @@ def get_water_conditions(dt):
         resp = requests.get(url)
         resp.raise_for_status()
         data = _water_to_dataframe(resp.text)
+        data['DATETIME'] = data.apply(_water_to_datetime, axis=1)
 
     else:
-        # retrieve historical data
-        if os.path.isfile(BUOY_HISTORICAL):
-            # read cached pickle
-            with open(BUOY_HISTORICAL, 'rb') as fp:
-                data = pickle.load(fp)
-        else:
-            # parse raw sources
-            sources = [
-                os.path.join(BUOY_DIR, '2014.txt'), 
-                os.path.join(BUOY_DIR, '2015.txt'),
-                os.path.join(BUOY_DIR, '2016.txt'),
-                os.path.join(BUOY_DIR, '2017.txt'),
-                os.path.join(BUOY_DIR, '2018-01.txt'),
-                os.path.join(BUOY_DIR, '2018-02.txt'),
-                os.path.join(BUOY_DIR, '2018-03.txt'),
-                ]
-            dfs = []
-            for src in sources:
-                with open(src, 'r') as fp:
-                    src_txt = fp.read()
-                dfs.append(raw_to_dataframe(src_txt))
-            data = dfs[0].append(dfs[1:])
-            data.reset_index(drop=True, inplace=True)
-            # cache as pickle
-            with open(BUOY_HISTORICAL, 'wb') as fp:
-                pickle.dump(data, fp)
+        data = water_historical_data
 
     # find the nearest record, should be within 2 hours
-    data['DATETIME'] = data.apply(_water_to_datetime, axis=1)
     time_diff = abs(dt_utc - data['DATETIME'])
     idx = time_diff.idxmin()
     rec = data.iloc[idx]
