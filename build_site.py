@@ -358,7 +358,7 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
 
     
-def get_water_conditions():
+def get_water_conditions(dt):
     """
     Retrieve observed water conditions at specified time
     
@@ -373,22 +373,102 @@ def get_water_conditions():
         dt: datetime, timezone aware, observation time
     
     Returns: dict with the following fields:
-        ...
+        WAVE-HEIGHT-METERS: Significant wave height (meters) is calculated as
+            the average of the highest one-third of all of the wave heights
+            during the 20-minute sampling period. See the Wave Measurements
+            section.
+        DOMINANT-WAVE-PERIOD-SECONDS: Dominant wave period (seconds) is the
+            period with the maximum wave energy. See the Wave Measurements
+            section.  AVERAGE-WAVE-PERIOD-SECONDS: Average wave period
+            (seconds) of all waves during the 20-minute period. See the Wave
+            Measurements section.
+        DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N: The direction from which the
+            waves at the dominant period (DPD) are coming. The units are
+            degrees from true North, increasing clockwise, with North as 0
+            (zero) degrees and East as 90 degrees. See the Wave Measurements
+            section.
+        WATER-TEMPERATIRE-DEGREES-C: Sea surface temperature (Celsius). For
+            buoys the depth is referenced to the hull's waterline. For fixed
+            platforms it varies with tide, but is referenced to, or near Mean
+            Lower Low Water (MLLW).
     """
+    # define internal utilities
+    def to_datetime(row):
+        dt = datetime(
+            year=round(row['YY']), month=round(row['MM']), day=round(row['DD']),
+            hour=round(row['hh']), minute=round(row['mm']), tzinfo=UTC)
+        return dt
+
+    def raw_to_dataframe(txt):
+        stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
+        data = pd.read_csv(stream, sep=' ', skiprows=[1])
+        data.replace('MM', nan)
+        return data
+
+    # init times
+    dt_utc = dt.astimezone(UTC)
+    now_utc = datetime.now(tz=UTC)
+    delta_days = (now_utc - dt_utc).days
+
+    if delta_days <= 5:
+        # retrieve hourly data for past 5 days
+        url = 'http://www.ndbc.noaa.gov/data/5day2/{}_5day.txt'.format(BUOY_NUM)
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = raw_to_dataframe(resp.text)
     
-    # download historical data
-    
-    # http://www.nws.noaa.gov/om/marine/internet.htm
-    # http://tgftp.nws.noaa.gov/data/forecasts/marine/coastal/an/anz233.txt    
-    # resp = requests.get('http://marine.weather.gov/MapClick.php?lat=41.4378&lon=-70.771&FcstType=digitalDWML')
-    # http://www.ndbc.noaa.gov/rt_data_access.shtml
-    # http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt    
-    # http://www.ndbc.noaa.gov/station_page.php?station=BZBM3
-    # http://www.ndbc.noaa.gov/station_realtime.php?station=BZBM3
-    # http://www.ndbc.noaa.gov/data/realtime2/BZBM3.txt
-    # http://www.ndbc.noaa.gov/measdes.shtml#stdmet
-    # http://www.ndbc.noaa.gov/station_history.php?station=bzbm3
-    # http://www.ndbc.noaa.gov/data/historical/stdmet/bzbm3h2017.txt.gz
+    elif delta_days <= 45:
+        # retrieve hourly data for past 45 days
+        url = 'http://www.ndbc.noaa.gov/data/realtime2/{}.txt'.format(BUOY_NUM)
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = raw_to_dataframe(resp.text)
+
+    else:
+        # retrieve historical data
+        if os.path.isfile(BUOY_HISTORICAL):
+            # read cached pickle
+            with open(BUOY_HISTORICAL, 'rb') as fp:
+                data = pickle.load(fp)
+        else:
+            # parse raw sources
+            sources = [
+                os.path.join(BUOY_DIR, '2014.txt'), 
+                os.path.join(BUOY_DIR, '2015.txt'),
+                os.path.join(BUOY_DIR, '2016.txt'),
+                os.path.join(BUOY_DIR, '2017.txt'),
+                os.path.join(BUOY_DIR, '2018-01.txt'),
+                os.path.join(BUOY_DIR, '2018-02.txt'),
+                os.path.join(BUOY_DIR, '2018-03.txt'),
+                ]
+            dfs = []
+            for src in sources:
+                with open(src, 'r') as fp:
+                    src_txt = fp.read()
+                dfs.append(raw_to_dataframe(src_txt))
+            data = dfs[0].append(dfs[1:])
+            data.reset_index(drop=True, inplace=True)
+            # cache as pickle
+            with open(BUOY_HISTORICAL, 'wb') as fp:
+                pickle.dump(data, fp)
+
+    # find the nearest record, should be within 2 hours
+    data['DATETIME'] = data.apply(to_datetime, axis=1)
+    time_diff = abs(dt_utc - data['DATETIME'])
+    idx = time_diff.idxmin()
+    rec = data.iloc[idx]
+    logger.info('Closest water conditions record to {} is {}'.format(
+                dt_utc, data.iloc[idx]['DATETIME']))
+
+    # reformat resulting data
+    fields = {  # forecast.io names -> local names
+        'WVHT': 'WAVE-HEIGHT-METERS',
+        'DPD': 'DOMINANT-WAVE-PERIOD-SECONDS',
+        'APD': 'AVERAGE-WAVE-PERIOD-SECONDS',
+        'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
+        'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
+        }
+    return {v: rec[n] for n, v in fields.items()}
 
 
 # update plots ---------------------------------------------------------------
@@ -571,108 +651,11 @@ if __name__ == '__main__':
     # add_missing_days(sheet)
     # add_missing_dows(sheet)
     # add_missing_weather(sheet)
-    # data = get_water_conditions()
-
-    dt = datetime.now(tz=US_EASTERN) - timedelta(days=100)
-
-    dt_utc = dt.astimezone(UTC)
-    now_utc = datetime.now(tz=UTC)
     
-    delta_days = (now_utc - dt_utc).days
+    dt = datetime.now(tz=US_EASTERN) - timedelta(days=1)
+    data = get_water_conditions(dt)
 
-    def to_datetime(row):
-        dt = datetime(year=round(row['YY']), month=round(row['MM']),
-                      day=round(row['DD']), hour=round(row['hh']),
-                      minute=round(row['mm']), tzinfo=UTC)
-        return dt
 
-    def raw_to_dataframe(txt):
-        stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
-        data = pd.read_csv(stream, sep=' ', skiprows=[1])
-        data.replace('MM', nan)
-        return data
-
-    if delta_days <= 5:
-        # retrieve hourly data for past 5 days
-        url = 'http://www.ndbc.noaa.gov/data/5day2/{}_5day.txt'.format(BUOY_NUM)
-        resp = requests.get(url)
-        resp.raise_for_status()
-        data = raw_to_dataframe(resp.text)
-    
-    elif delta_days <= 45:
-        # retrieve hourly data for past 45 days
-        url = 'http://www.ndbc.noaa.gov/data/realtime2/{}.txt'.format(BUOY_NUM)
-        resp = requests.get(url)
-        resp.raise_for_status()
-        data = raw_to_dataframe(resp.text)
-
-    else:
-        # retrieve historical data
-        if os.path.isfile(BUOY_HISTORICAL):
-            # read cached pickle
-            with open(BUOY_HISTORICAL, 'rb') as fp:
-                data = pickle.load(fp)
-        
-        else:
-            # parse raw sources
-            sources = [
-                os.path.join(BUOY_DIR, '2014.txt'), 
-                os.path.join(BUOY_DIR, '2015.txt'),
-                os.path.join(BUOY_DIR, '2016.txt'),
-                os.path.join(BUOY_DIR, '2017.txt'),
-                os.path.join(BUOY_DIR, '2018-01.txt'),
-                os.path.join(BUOY_DIR, '2018-02.txt'),
-                os.path.join(BUOY_DIR, '2018-03.txt'),
-                ]
-            dfs = []
-            for src in sources:
-                with open(src, 'r') as fp:
-                    src_txt = fp.read()
-                dfs.append(raw_to_dataframe(src_txt))
-            data = dfs[0].append(dfs[1:])
-            data.reset_index(drop=True, inplace=True)
-            # cache as pickle
-            with open(BUOY_HISTORICAL, 'wb') as fp:
-                pickle.dump(data, fp)
-
-    # convert to dataframe
-    
-    # find the nearest record, should be within 2 hours
-    data['DATETIME'] = data.apply(to_datetime, axis=1)
-    time_diff = abs(dt_utc - data['DATETIME'])
-    idx = time_diff.idxmin()
-    rec = data.iloc[idx]
-    logger.info('Closest water conditions record to {} is {}'.format(
-                dt_utc, data.iloc[idx]['DATETIME']))
-
-    docstring = """
-    WAVE-HEIGHT-METERS: Significant wave height (meters) is calculated as the
-        average of the highest one-third of all of the wave heights during the
-        20-minute sampling period. See the Wave Measurements section.
-    DOMINANT-WAVE-PERIOD-SECONDS: Dominant wave period (seconds) is the period
-        with the maximum wave energy. See the Wave Measurements section.
-    AVERAGE-WAVE-PERIOD-SECONDS: Average wave period (seconds) of all waves
-        during the 20-minute period. See the Wave Measurements section.
-    DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N: The direction from which the
-        waves at the dominant period (DPD) are coming. The units are degrees
-        from true North, increasing clockwise, with North as 0 (zero) degrees
-        and East as 90 degrees. See the Wave Measurements section.
-    WATER-TEMPERATIRE-DEGREES-C: Sea surface temperature (Celsius). For buoys
-        the depth is referenced to the hull's waterline. For fixed platforms it
-        varies with tide, but is referenced to, or near Mean Lower Low Water
-        (MLLW).
-    """
-     
-    # reformat resulting data
-    fields = {  # forecast.io names -> local names
-        'WVHT': 'WAVE-HEIGHT-METERS',
-        'DPD': 'DOMINANT-WAVE-PERIOD-SECONDS',
-        'APD': 'AVERAGE-WAVE-PERIOD-SECONDS',
-        'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
-        'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
-        }
-    
-    data_dict = {v: rec[n] for n, v in fields.items()}
 
 
 
