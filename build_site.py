@@ -329,6 +329,10 @@ def add_missing_water(sheet):
                 cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, new_value)
                 to_update.append(cell)
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
+        
+        # DEBUG
+        if ii > 10:
+            break
 
     # update all at once
     if to_update:
@@ -400,6 +404,29 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
         }
     return {v: data['currently'].get(n, None) for n, v in fields.items()}
 
+
+def _water_to_datetime(row):
+    dt = datetime(
+        year=round(row['YY']), month=round(row['MM']), day=round(row['DD']),
+        hour=round(row['hh']), minute=round(row['mm']), tzinfo=UTC)
+    return dt
+
+
+def _water_to_dataframe(txt):
+    stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
+    data = pd.read_csv(stream, sep=' ', skiprows=[1])
+    data.replace('MM', nan)
+    return data
+
+
+def _water_convert_type(val):
+    if isinstance(val, np.float64):
+        return float(val)
+    elif isinstance(val, np.int64):
+        return float(val)
+    else:
+        raise TypeError('Unhandled type conversion')
+
     
 def get_water_conditions(dt):
     """
@@ -435,27 +462,6 @@ def get_water_conditions(dt):
             platforms it varies with tide, but is referenced to, or near Mean
             Lower Low Water (MLLW).
     """
-    # define internal utilities
-    def to_datetime(row):
-        dt = datetime(
-            year=round(row['YY']), month=round(row['MM']), day=round(row['DD']),
-            hour=round(row['hh']), minute=round(row['mm']), tzinfo=UTC)
-        return dt
-
-    def raw_to_dataframe(txt):
-        stream = io.StringIO(re.sub(r' +', ' ', txt).replace('#', ''))
-        data = pd.read_csv(stream, sep=' ', skiprows=[1])
-        data.replace('MM', nan)
-        return data
-    
-    def convert_type(val):
-        if isinstance(val, np.float64):
-            return float(val)
-        elif isinstance(val, np.int64):
-            return float(val)
-        else:
-            raise TypeError('Unhandled type conversion')
-
     # init times
     dt_utc = dt.astimezone(UTC)
     now_utc = datetime.now(tz=UTC)
@@ -466,14 +472,14 @@ def get_water_conditions(dt):
         url = 'http://www.ndbc.noaa.gov/data/5day2/{}_5day.txt'.format(BUOY_NUM)
         resp = requests.get(url)
         resp.raise_for_status()
-        data = raw_to_dataframe(resp.text)
+        data = _water_to_dataframe(resp.text)
     
     elif delta_days <= 45:
         # retrieve hourly data for past 45 days
         url = 'http://www.ndbc.noaa.gov/data/realtime2/{}.txt'.format(BUOY_NUM)
         resp = requests.get(url)
         resp.raise_for_status()
-        data = raw_to_dataframe(resp.text)
+        data = _water_to_dataframe(resp.text)
 
     else:
         # retrieve historical data
@@ -504,7 +510,7 @@ def get_water_conditions(dt):
                 pickle.dump(data, fp)
 
     # find the nearest record, should be within 2 hours
-    data['DATETIME'] = data.apply(to_datetime, axis=1)
+    data['DATETIME'] = data.apply(_water_to_datetime, axis=1)
     time_diff = abs(dt_utc - data['DATETIME'])
     idx = time_diff.idxmin()
     rec = data.iloc[idx]
@@ -519,7 +525,7 @@ def get_water_conditions(dt):
         'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
         'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
         }
-    return {v: convert_type(rec[n]) for n, v in fields.items()}
+    return {v: _water_convert_type(rec[n]) for n, v in fields.items()}
 
 
 # update plots ---------------------------------------------------------------
