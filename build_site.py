@@ -706,7 +706,7 @@ def build_site():
 if __name__ == '__main__':
 
     client, doc, sheet = get_client() 
-    # add_missing_days(sheet)
-    # add_missing_dows(sheet)
-    # add_missing_weather(sheet)
+    add_missing_days(sheet)
+    add_missing_dows(sheet)
+    add_missing_weather(sheet) # NOTE: expect unhandled rate failure
     add_missing_water(sheet)
