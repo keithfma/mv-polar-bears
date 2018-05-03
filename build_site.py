@@ -81,6 +81,16 @@ def is_google_quota_error(err):
     return tf
 
 
+def is_darksky_quota_error(err):
+    """Return Tre if input 'err' is a DarkSky quota error, else False"""
+    tf = False
+    if isinstance(err, requests.exceptions.HTTPError):
+        resp = err.response
+        if resp.status_code == 403 and 'darksky' in resp.url:
+            tf = True
+    return tf
+
+
 def api(func):
     """
     Wrap input function to handle known API issues (e.g., rate limits, errors)
@@ -108,6 +118,12 @@ def api(func):
                     logger.warning(msg)
                     sleep(GOOGLE_WAIT_SEC)
                     continue
+
+                if is_darksky_quota_error(err):
+                    # DarkSky API quota exceeded, log error and exit
+                    msg = 'DarkSky API quota exceeded, terminating function'
+                    logger.error(msg)
+                    break
                 
                 else:
                     # some other error, fail
@@ -258,6 +274,7 @@ def add_missing_weather(sheet):
 
     """
     # constants
+    batch_size = 25 
     weather_col_names = [
         'CLOUD-COVER-PERCENT', 'HUMIDITY-PERCENT', 'PRECIP-RATE-INCHES-PER-HOUR',
         'PRECIP-PROBABILITY', 'WEATHER-SUMMARY', 'AIR-TEMPERATURE-DEGREES-F',
@@ -272,7 +289,7 @@ def add_missing_weather(sheet):
     to_update = []
     for ii in range(len(content)):
         row = content.iloc[ii]
-        if any(pd.isnull(row[weather_col_names])):
+        if all(pd.isnull(row[weather_col_names])):
             # get weather
             dt = parse_datetime(row['DATE'], row['TIME'])
             weather_data = get_weather_conditions(dt=dt)
@@ -285,10 +302,11 @@ def add_missing_weather(sheet):
                 to_update.append(cell)
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
 
-    # update all at once
-    if to_update:
-        sheet.update_cells(to_update, 'USER_ENTERED')
-        logger.info('Updated weather conditions data in {} cells'.format(len(to_update)))
+        # update batch
+        if len(to_update) >= batch_size or ii == len(content) - 1:
+            sheet.update_cells(to_update, 'USER_ENTERED')
+            logger.info('Updated weather conditions data in {} cells'.format(len(to_update)))
+            to_update = []
 
 
 @api
@@ -708,5 +726,5 @@ if __name__ == '__main__':
     client, doc, sheet = get_client() 
     add_missing_days(sheet)
     add_missing_dows(sheet)
-    add_missing_weather(sheet) # NOTE: expect unhandled rate failure
-    add_missing_water(sheet)
+    add_missing_weather(sheet)
+    add_missing_water(sheet) # convert 999 to None
