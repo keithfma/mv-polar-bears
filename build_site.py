@@ -332,13 +332,14 @@ def add_missing_water(sheet):
     content = read_sheet(sheet)
 
     # compile list of cells to update at-once
+    historical = get_historical_water_conditions()
     to_update = []
     for ii in range(len(content)):
         row = content.iloc[ii]
-        if any(pd.isnull(row[water_col_names])):
+        if all(pd.isnull(row[water_col_names])):
             # get water conditions 
             dt = parse_datetime(row['DATE'], row['TIME'])
-            water_data = get_water_conditions(dt=dt)
+            water_data = get_water_conditions(dt, historical)
             # queue update for all missing cells
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
             for col_name in water_col_names:
@@ -441,37 +442,45 @@ def _water_convert_type(val):
     else:
         raise TypeError('Unhandled type conversion')
 
-    
-# retrieve historical water conditions data, used in get_water_conditions()
-if os.path.isfile(BUOY_HISTORICAL):
-    # read cached pickle
-    with open(BUOY_HISTORICAL, 'rb') as fp:
-        water_historical_data = pickle.load(fp)
-else:
-    # parse raw sources
-    sources = [
-        os.path.join(BUOY_DIR, '2014.txt'), 
-        os.path.join(BUOY_DIR, '2015.txt'),
-        os.path.join(BUOY_DIR, '2016.txt'),
-        os.path.join(BUOY_DIR, '2017.txt'),
-        os.path.join(BUOY_DIR, '2018-01.txt'),
-        os.path.join(BUOY_DIR, '2018-02.txt'),
-        os.path.join(BUOY_DIR, '2018-03.txt'),
-        ]
-    dfs = []
-    for src in sources:
-        with open(src, 'r') as fp:
-            src_txt = fp.read()
-        dfs.append(_water_to_dataframe(src_txt))
-    water_historical_data = dfs[0].append(dfs[1:])
-    water_historical_data.reset_index(drop=True, inplace=True)
-    water_historical_data['DATETIME'] = water_historical_data.apply(_water_to_datetime, axis=1)
-    # cache as pickle
-    with open(BUOY_HISTORICAL, 'wb') as fp:
-        pickle.dump(water_historical_data, fp)
+
+def get_historical_water_conditions():
+    """
+    Retrieve historical water conditions data and cache as pickle
+
+    Returns: dataframe, see get_water_conditions for column definitions
+    """
+
+    if os.path.isfile(BUOY_HISTORICAL):
+        # read cached pickle
+        with open(BUOY_HISTORICAL, 'rb') as fp:
+            water_historical_data = pickle.load(fp)
+    else:
+        # parse raw sources
+        sources = [
+            os.path.join(BUOY_DIR, '2014.txt'), 
+            os.path.join(BUOY_DIR, '2015.txt'),
+            os.path.join(BUOY_DIR, '2016.txt'),
+            os.path.join(BUOY_DIR, '2017.txt'),
+            os.path.join(BUOY_DIR, '2018-01.txt'),
+            os.path.join(BUOY_DIR, '2018-02.txt'),
+            os.path.join(BUOY_DIR, '2018-03.txt'),
+            ]
+        dfs = []
+        for src in sources:
+            with open(src, 'r') as fp:
+                src_txt = fp.read()
+            dfs.append(_water_to_dataframe(src_txt))
+        water_historical_data = dfs[0].append(dfs[1:])
+        water_historical_data.reset_index(drop=True, inplace=True)
+        water_historical_data['DATETIME'] = water_historical_data.apply(_water_to_datetime, axis=1)
+        # cache as pickle
+        with open(BUOY_HISTORICAL, 'wb') as fp:
+            pickle.dump(water_historical_data, fp)
+
+    return water_historical_data
 
 
-def get_water_conditions(dt):
+def get_water_conditions(dt, historical):
     """
     Retrieve observed water conditions at specified time
     
@@ -484,6 +493,10 @@ def get_water_conditions(dt):
     
     Arguments:
         dt: datetime, timezone aware, observation time
+        historical: dataframe containing historical water conditions data, as
+            returned by get_historical_water_conditions(), included as an
+            argument to avoid re-reading data from disk if this function is
+            called multiple times
     
     Returns: dict with the following fields:
         WAVE-HEIGHT-METERS: Significant wave height (meters) is calculated as
@@ -527,7 +540,7 @@ def get_water_conditions(dt):
         data['DATETIME'] = data.apply(_water_to_datetime, axis=1)
 
     else:
-        data = water_historical_data
+        data = historical
 
     # find the nearest record, should be within 2 hours
     time_diff = abs(dt_utc - data['DATETIME'])
@@ -537,14 +550,28 @@ def get_water_conditions(dt):
                 dt_utc, data.iloc[idx]['DATETIME']))
 
     # reformat resulting data
-    fields = {  # forecast.io names -> local names
+    fields = {  # NBDC names -> local names
         'WVHT': 'WAVE-HEIGHT-METERS',
         'DPD': 'DOMINANT-WAVE-PERIOD-SECONDS',
         'APD': 'AVERAGE-WAVE-PERIOD-SECONDS',
         'MWD': 'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N',
         'WTMP': 'WATER-TEMPERATURE-DEGREES-C',
         }
-    return {v: _water_convert_type(rec[n]) for n, v in fields.items()}
+    out = {v: _water_convert_type(rec[n]) for n, v in fields.items()}
+
+    # set NA values
+    na_values = {
+        'WAVE-HEIGHT-METERS': 99,
+        'DOMINANT-WAVE-PERIOD-SECONDS': 99,
+        'AVERAGE-WAVE-PERIOD-SECONDS': 99,
+        'DOMINANT-WAVE-DIRECTION-DEGREES-CW-FROM-N': 999,
+        'WATER-TEMPERATURE-DEGREES-C': 99,
+        }
+    for key, val in na_values.items():
+        if out[key] == val:
+            out[key] == nan
+
+    return out
 
 
 # update plots ---------------------------------------------------------------
@@ -727,4 +754,4 @@ if __name__ == '__main__':
     add_missing_days(sheet)
     add_missing_dows(sheet)
     add_missing_weather(sheet)
-    add_missing_water(sheet) # convert 999 to None
+    add_missing_water(sheet)
