@@ -454,8 +454,8 @@ def _water_convert_type(val):
     elif isinstance(val, np.int64):
         return float(val)
     else:
-        set_trace()
-        raise TypeError('Unhandled type conversion')
+        # default case, do nothing 
+        return val
 
 
 def get_historical_water_conditions():
