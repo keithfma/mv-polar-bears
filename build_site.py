@@ -203,6 +203,22 @@ def add_missing_days(sheet):
     content = read_sheet(sheet)
     col2ind = get_column_indices(sheet, base=0)
 
+    def new_row(dt):
+        """Return list of cells for a new row at datetime 'dt'"""
+        row = [None] * len(content.columns)
+        row[col2ind['DATE']] = dt.strftime('%Y-%m-%d')
+        row[col2ind['TIME']] = dt.strftime('%H:%M %p')
+        return row
+
+    # add current day at last row if needed
+    date_and_time = content[['DATE', 'TIME']].itertuples(index=False)
+    dts = [parse_datetime(*rec) for rec in date_and_time]
+    latest = max(dts)
+    today = datetime.now(tz=US_EASTERN).replace(hour=7, minute=30, second=0, microsecond=0)
+    if latest < today:
+        sheet.append_row(new_row(today), 'USER_ENTERED')
+        logger.info('Appended row for {}'.format(today))
+
     # ensure minimum daily frequency by adding empty rows as needed
     rid = 3 # 1-based index to google sheet row
     prev_dt = parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
@@ -220,10 +236,7 @@ def add_missing_days(sheet):
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
             day = prev_dt + timedelta(days=jj + 1)
-            row_values = [None] * len(content.columns)
-            row_values[col2ind['DATE']] = day.strftime('%Y-%m-%d')
-            row_values[col2ind['TIME']] = day.strftime('%H:%M %p')
-            sheet.insert_row(row_values, rid, 'USER_ENTERED')
+            sheet.insert_row(new_row(day), rid, 'USER_ENTERED')
             logger.info('Added row for {} at index {}'.format(day, rid))
             rid += 1
         
