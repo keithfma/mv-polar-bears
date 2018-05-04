@@ -333,6 +333,7 @@ def add_missing_water(sheet):
 
     """
     # constants
+    batch_size = 25 
     water_col_names = [
         'WAVE-HEIGHT-METERS',
         'DOMINANT-WAVE-PERIOD-SECONDS',
@@ -354,6 +355,8 @@ def add_missing_water(sheet):
             # get water conditions 
             dt = parse_datetime(row['DATE'], row['TIME'])
             water_data = get_water_conditions(dt, historical)
+            if any([isinstance(x, str) and x.find('MM') != -1 for x in water_data.values()]):
+                set_trace()
             # queue update for all missing cells
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
             for col_name in water_col_names:
@@ -363,10 +366,13 @@ def add_missing_water(sheet):
                 to_update.append(cell)
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
 
-    # update all at once
-    if to_update:
-        sheet.update_cells(to_update, 'USER_ENTERED')
-        logger.info('Updated water conditions data in {} cells'.format(len(to_update)))
+        # update batch
+        batch_full = len(to_update) >= batch_size 
+        last_batch = (ii == len(content)-1) and to_update
+        if batch_full or last_batch:
+            sheet.update_cells(to_update, 'USER_ENTERED')
+            logger.info('Updated water conditions data in {} cells'.format(len(to_update)))
+            to_update = []
 
 
 def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=DARKSKY_KEY):
@@ -452,6 +458,10 @@ def _water_convert_type(val):
     if isinstance(val, np.float64):
         return float(val)
     elif isinstance(val, np.int64):
+        return float(val)
+    elif isinstance(val, str):
+        if val == 'MM':
+            return None 
         return float(val)
     else:
         # default case, do nothing 
