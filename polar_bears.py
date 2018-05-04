@@ -210,15 +210,6 @@ def add_missing_days(sheet):
         row[col2ind['TIME']] = dt.strftime('%H:%M %p')
         return row
 
-    # add current day at last row if needed
-    date_and_time = content[['DATE', 'TIME']].itertuples(index=False)
-    dts = [parse_datetime(*rec) for rec in date_and_time]
-    latest = max(dts)
-    today = datetime.now(tz=US_EASTERN).replace(hour=7, minute=30, second=0, microsecond=0)
-    if latest < today:
-        sheet.append_row(new_row(today), 'USER_ENTERED')
-        logger.info('Appended row for {}'.format(today))
-
     # ensure minimum daily frequency by adding empty rows as needed
     rid = 3 # 1-based index to google sheet row
     prev_dt = parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
@@ -243,6 +234,14 @@ def add_missing_days(sheet):
         # proceed to next row
         prev_dt = curr_dt
         rid += 1
+
+    # add rows up to current day if needed
+    latest = curr_dt
+    today = datetime.now(tz=US_EASTERN).replace(hour=7, minute=30, second=0, microsecond=0)
+    while curr_dt < today:
+        curr_dt += timedelta(days=1)
+        sheet.append_row(new_row(curr_dt), 'USER_ENTERED')
+        logger.info('Appended row for {}'.format(curr_dt))
 
 
 @api
@@ -316,7 +315,9 @@ def add_missing_weather(sheet):
                 logger.info('Queue {} -> {} for row {}'.format(col_name, new_value, sheet_row_idx))
 
         # update batch
-        if len(to_update) >= batch_size or ii == len(content) - 1:
+        batch_full = len(to_update) >= batch_size 
+        last_batch = (ii == len(content)-1) and to_update
+        if batch_full or last_batch:
             sheet.update_cells(to_update, 'USER_ENTERED')
             logger.info('Updated weather conditions data in {} cells'.format(len(to_update)))
             to_update = []
@@ -453,6 +454,7 @@ def _water_convert_type(val):
     elif isinstance(val, np.int64):
         return float(val)
     else:
+        set_trace()
         raise TypeError('Unhandled type conversion')
 
 
