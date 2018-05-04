@@ -3,13 +3,8 @@ Generate static website for simple data visualization
 """
 
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 from numpy import nan
-from bokeh import plotting as bk_plt
-from bokeh import models as bk_model
-from bokeh import embed as bk_embed
-import jinja2
 import os
 import requests
 import pytz
@@ -24,42 +19,23 @@ import io
 import re
 import pickle
 import numpy as np
+import argparse
+from pkg_resources import resource_filename
+from mv_polar_bears.util import get_client, read_sheet
 
-
-# config constants
-GOOGLE_KEY = 'google_secret.json'
-DOC_TITLE = 'MV Polar Bears'
-SHEET_TITLE = 'Debug'
-DARKSKY_KEY = 'darksky_secret.json'
+# constants
 BUOY_NUM = '44020' # Buoy in Nantucket Sound
-BUOY_DIR = os.path.join('data', 'NDBC_Buoy_{}'.format(BUOY_NUM))
-BUOY_HISTORICAL = os.path.join(BUOY_DIR, 'historical.pkl')
+DATA_DIR = resource_filename('mv_polar_bears', 'data')
+BUOY_HISTORICAL = os.path.join(DATA_DIR, 'historical.pkl')
 LOG_LEVEL = logging.INFO
 GOOGLE_WAIT_SEC = 60
-
-# physical constants
 INKWELL_LAT = 41.452463 # degrees N
 INKWELL_LON = -70.553526 # degrees E
 US_EASTERN = pytz.timezone('US/Eastern')
 UTC = pytz.timezone('UTC')
 
-# plot format constants
-GROUP_COLOR = 'royalblue'
-NEWBIES_COLOR = 'forestgreen'
-FONT_SIZE = '20pt'
-DAY_TO_MSEC = 60*60*24*1000
-
-# webpage constants
-WEBPAGE_TITLE = 'MV Polar Bears!'
-PUBLISH_DIR = 'docs'
-
 # init logging
-logging.basicConfig(level=LOG_LEVEL)
 logger = logging.getLogger('mv-polar-bears')
-logger.setLevel(LOG_LEVEL)
-
-
-# utilities ------------------------------------------------------------------
 
 
 def parse_datetime(date_str, time_str):
@@ -135,44 +111,6 @@ def api(func):
     return wrapper
 
 
-def get_client(key_file=GOOGLE_KEY, doc_title=DOC_TITLE, sheet_title=SHEET_TITLE):
-    """
-    Return interfaces to Google Sheets data store
-    
-    Arguments:
-        key_file: Google Sheets / Drive API secret key file
-        doc_title: Title / filename for google spreadsheet
-        sheet_title: Title for worksheet within google spreadsheet
-    
-    Returns:
-        client: gspread.client.Client
-        doc: gspread.models.Spreadsheet
-        sheet: gspread.models.Worksheet
-    """
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
-    client = gspread.authorize(creds)
-    doc = client.open(doc_title)
-    sheet = doc.worksheet(sheet_title)
-    return client, doc, sheet
-
-
-def read_sheet(sheet):
-    """
-    Read current data from Google Sheets
-
-    Arguments:
-        sheet: gspread sheet, connected
-
-    Return: pd dataframe containing current data
-    """
-    content = sheet.get_all_records(default_blank=nan)
-    content = pd.DataFrame(content)
-    logger.info('Read sheet contents')
-    return content
-
-
 def get_column_indices(sheet, base=0):
     """
     Return lookup table {column name: column index}
@@ -187,9 +125,6 @@ def get_column_indices(sheet, base=0):
     return {name: ii+base for ii, name in enumerate(hdr)}
 
 
-# data update ----------------------------------------------------------------
-
-
 @api
 def add_missing_days(sheet):
     """
@@ -198,6 +133,7 @@ def add_missing_days(sheet):
     Arguments:
         sheet: gspread sheet, connected
     """
+    logger.info('Adding rows for missing days')
 
     # get current content
     content = read_sheet(sheet)
@@ -252,6 +188,8 @@ def add_missing_dows(sheet):
     Arguments:
         sheet: gspread sheet, connected
     """
+    logger.info('Adding missing day-of-week data')
+
     # get current content
     content = read_sheet(sheet)
 
@@ -277,14 +215,16 @@ def add_missing_dows(sheet):
 
 
 @api
-def add_missing_weather(sheet):
+def add_missing_weather(sheet, darksky_key):
     """
     Populate missing weather cells
 
     Arguments:
         sheet: gspread sheet, connected
-
+        darksky_key: path to DarkSky API key file
     """
+    logger.info('Adding missing weather conditions data')
+
     # constants
     batch_size = 25 
     weather_col_names = [
@@ -293,6 +233,8 @@ def add_missing_weather(sheet):
         'WIND-BEARING-CW-DEGREES-FROM-N', 'WIND-GUST-SPEED-MPH',
         'WIND-SPEED-MPH']     
     col_idxs = get_column_indices(sheet, base=1)
+    with open(darksky_key, 'r') as fp:
+        key = json.load(fp)['secret_key']
 
     # get current content
     content = read_sheet(sheet)
@@ -304,7 +246,7 @@ def add_missing_weather(sheet):
         if all(pd.isnull(row[weather_col_names])):
             # get weather
             dt = parse_datetime(row['DATE'], row['TIME'])
-            weather_data = get_weather_conditions(dt=dt)
+            weather_data = get_weather_conditions(key, dt=dt)
             # queue update for all missing cells
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
             for col_name in weather_col_names:
@@ -332,6 +274,8 @@ def add_missing_water(sheet):
         sheet: gspread sheet, connected
 
     """
+    logger.info('Adding missing water conditions data')
+
     # constants
     batch_size = 25 
     water_col_names = [
@@ -375,7 +319,7 @@ def add_missing_water(sheet):
             to_update = []
 
 
-def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=DARKSKY_KEY):
+def get_weather_conditions(key, lon=INKWELL_LON, lat=INKWELL_LAT, dt=None):
     """
     Retrieve forecast or observed weather conditions
     
@@ -383,13 +327,13 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
         https://darksky.net/dev/docs
     
     Arguments:
+        key: string, Dark Sky API key
         lon: longitude of a location (in decimal degrees). Positive is east,
             negative is west, default is Inkwell beach, Oak Bluffs
         lat: latitude of a location (in decimal degrees). Positive is north,
             negative is south, default is Inkwell beach, Oak Bluffs
         dt: datetime, timezone-aware, time for observation, default is now in
             US/Eastern timezone
-        key_file: JSON file containing Dark Sky API key
     
     Returns: Dict with the following fields (renamed from forecast.io):
         CLOUD-COVER-PERCENT: The percentage of sky occluded by clouds, between
@@ -415,8 +359,6 @@ def get_weather_conditions(lon=INKWELL_LON, lat=INKWELL_LAT, dt=None, key_file=D
         dt = datetime.now(tz=US_EASTERN)
 
     # request data from Dark Sky API (e.g. forecast.io)
-    with open(key_file, 'r') as fp:
-        key = json.load(fp)['secret_key']
     stamp = math.floor(dt.timestamp())
     url = 'https://api.darksky.net/forecast/{}/{:.10f},{:.10f},{}'.format(
         key, lat, lon, stamp)
@@ -467,6 +409,7 @@ def _water_convert_type(val):
         # default case, do nothing 
         return val
 
+# TODO: automatically handle retrieving new data...
 
 def get_historical_water_conditions():
     """
@@ -482,13 +425,13 @@ def get_historical_water_conditions():
     else:
         # parse raw sources
         sources = [
-            os.path.join(BUOY_DIR, '2014.txt'), 
-            os.path.join(BUOY_DIR, '2015.txt'),
-            os.path.join(BUOY_DIR, '2016.txt'),
-            os.path.join(BUOY_DIR, '2017.txt'),
-            os.path.join(BUOY_DIR, '2018-01.txt'),
-            os.path.join(BUOY_DIR, '2018-02.txt'),
-            os.path.join(BUOY_DIR, '2018-03.txt'),
+            os.path.join(DATA_DIR, '2014.txt'), 
+            os.path.join(DATA_DIR, '2015.txt'),
+            os.path.join(DATA_DIR, '2016.txt'),
+            os.path.join(DATA_DIR, '2017.txt'),
+            os.path.join(DATA_DIR, '2018-01.txt'),
+            os.path.join(DATA_DIR, '2018-02.txt'),
+            os.path.join(DATA_DIR, '2018-03.txt'),
             ]
         dfs = []
         for src in sources:
@@ -599,184 +542,40 @@ def get_water_conditions(dt, historical):
     return out
 
 
-# update plots ---------------------------------------------------------------
-
-
-def add_dates(data):
+def update(google_key, darksky_key, log_level):
     """
-    Convert year, month, day columns to datetime.date objects
-
-    Return: Nothing, adds "DATE" column to dataframe
-    """
-    data['DATE'] = pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]).dt.date
-    data.set_index(pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]), inplace=True)
-
-
-def set_font_size(fig):
-    """Update font sizes in input Bokeh figures"""
-    fig.title.text_font_size = FONT_SIZE
-    fig.xaxis.axis_label_text_font_size = FONT_SIZE
-    fig.yaxis.axis_label_text_font_size = FONT_SIZE
-    fig.xaxis.major_label_text_font_size = FONT_SIZE
-    fig.yaxis.major_label_text_font_size = FONT_SIZE
-    fig.legend.label_text_font_size = FONT_SIZE
-
-
-def set_ylabel_to_positive(fig):
-    """Replace negative-valued y labels with thier absolute value"""
-    fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
-
-
-def daily_bar_plot(data):
-    """
-    Arguments:
-        data: pandas dataframe
-
-    Returns: script, div
-        script: javascript function controlling plot, wrapped in <script> HTML tags
-        div: HTML <div> modified by javascript to show plot
-    """
-    # create figure
-    fig = bk_plt.figure(
-        title="Daily Attendence",
-        x_axis_label='Date',
-        x_axis_type='datetime',
-        y_axis_label='# Attendees',
-        plot_width=1700,
-        tools="pan,wheel_zoom,box_zoom,reset",
-        logo=None
-        )
-    
-    # add bar plots
-    fig.vbar(
-        x=data['DATE'], width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
-        color=GROUP_COLOR, legend='Group')
-    fig.vbar(
-        x=data['DATE'], width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
-        color=NEWBIES_COLOR, legend='Newbies')
-
-    # additional formatting
-    set_font_size(fig)
-    set_ylabel_to_positive(fig)
-
-    return bk_embed.components(fig)
-
-
-def weekly_bar_plot(data):
-    """
-    Arguments:
-        data: pandas dataframe
-
-    Returns: script, div
-        script: javascript function controlling plot, wrapped in <script> HTML tags
-        div: HTML <div> modified by javascript to show plot
-    """
-    # compute weekly sums
-    weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
-
-    # create figure
-    fig = bk_plt.figure(
-        title="Weekly Attendence",
-        x_axis_label='Week Start Date',
-        x_axis_type='datetime',
-        y_axis_label='Total # Attendees',
-        plot_width=1700,
-        tools="pan,wheel_zoom,box_zoom,reset",
-        logo=None
-        )
-    
-    # add bar plots
-    fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=0, top=weekly['GROUP'],
-        color=GROUP_COLOR, legend='Group')
-    fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=-weekly['NEWBIES'], top=0,
-        color=NEWBIES_COLOR, legend='Newbies')
-
-    # additional formatting
-    set_font_size(fig)
-    set_ylabel_to_positive(fig)
-
-    return bk_embed.components(fig)
-
-
-def resample_to_daily(data):
-    """Resample input dataframe to daily resolution (initial cleaning step)"""
-    lookup_day = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-    data = data.resample('D').mean() # daily frequency, no gaps
-    data['DATE'] = pd.Series(
-        {x: x.to_pydatetime().date() for x in data.index})
-    data['YEAR'] = data['DATE'].apply(lambda x: x.year)
-    data['MONTH'] = data['DATE'].apply(lambda x: x.month)
-    data['DAY'] = data['DATE'].apply(lambda x: x.day)
-    data['DAY-OF-WEEK'] = data['DATE'].apply(lambda x: lookup_day[x.weekday()])
-    data.set_index('DATE', drop=False, inplace=True)
-    return data
-
-
-def get_table_data(data):
-    """
-    Munge data to build a daily view of all available data
+    Update all data in MV Polar Bears data sheet
     
     Arguments:
-        data: pandas dataframe
-
-    Returns:
-        list of dicts, each containing data for a single day, with no gaps
+        google_key: path to Google API key file
+        darksky_key: path to DarkSky API key file
+        log_level: string, logging level, one of 'critical', 'error',
+            'warning', 'info', 'debug'
     """
-    table_data = data.replace(nan, '-')
-    table_dict = table_data.T.to_dict()
-    table = []
-    for date in sorted(table_data['DATE']):
-        table.append(table_dict[date])
-    table.sort(key=lambda x: x['DATE'], reverse=True)
-    return table
+    lvl = getattr(logging, log_level.upper())
+    logging.basicConfig(level=lvl)
+    logger.setLevel(lvl)
 
-
-def build_site():
-    """Get/update data and build static HTML / JS site"""
-
-    data = sheets_read_data()
-    add_dates(data)
-    data = resample_to_daily(data)
-    
-    daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
-    daily_table = get_table_data(data)
-
-    env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader('templates'),
-        autoescape=jinja2.select_autoescape(['html', 'css'])
-        )
-
-    index_template = env.get_template('index.html')
-    with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
-        index_content = index_template.render(
-            title=WEBPAGE_TITLE,
-            daily_table=daily_table,
-            daily_bar_div=daily_bar_div,
-            daily_bar_script=daily_bar_script,
-            weekly_bar_div=weekly_bar_div,
-            weekly_bar_script=weekly_bar_script
-            )
-        index_fp.write(index_content)
-
-    style_template = env.get_template('style.css')
-    with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
-        style_content = style_template.render()
-        style_fp.write(style_content)
-
-
-# TODO: write command-line wrapper for build_site
-# TODO: write function for update_data
-# TODO: write command-line wrapper for update_data
-
-
-# DEBUG / TESTING
-if __name__ == '__main__':
-
-    client, doc, sheet = get_client() 
+    logger.info('Updating MV Polar Bears data sheet')
+    client, doc, sheet = get_client(google_key) 
     add_missing_days(sheet)
     add_missing_dows(sheet)
-    add_missing_weather(sheet)
+    add_missing_weather(sheet, darksky_key)
     add_missing_water(sheet)
+    logger.info('Update complete')
+
+
+def update_cli():
+    """Command line interface to update MV Polar Bears data sheet"""
+    ap = argparse.ArgumentParser(
+        description="Update data in MV Polar Bears data sheet",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    ap.add_argument('google_key', help="Path to Google API key file")
+    ap.add_argument('darksky_key', help="Path to DarkSky API key file")
+    ap.add_argument('--log_level', help='Log level to display',
+                    choices=['critical', 'error', 'warning', 'info', 'debug'],
+                    default='info')
+    args = ap.parse_args()
+
+    update(args.google_key, args.darksky_key, args.log_level) 
+
