@@ -13,6 +13,8 @@ import dateutil
 from numpy import nan
 from pkg_resources import resource_filename
 from pdb import set_trace
+import argparse
+import logging
 
 # constants
 TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
@@ -23,6 +25,9 @@ NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '20pt'
 DAY_TO_MSEC = 60*60*24*1000
 US_EASTERN = pytz.timezone('US/Eastern')
+
+# init logging
+logger = logging.getLogger('mv-polar-bears')
 
 
 def set_font_size(fig):
@@ -132,13 +137,20 @@ def get_table_data(data):
     return table
 
 
-def build_site(keyfile):
+def update(keyfile, log_level):
     """
     Get data and build static HTML / JS site
     
     Arguments:
         keyfile: Google Sheets API key
+        log_level: string, logging level, one of 'critical', 'error',
+            'warning', 'info', 'debug'
     """
+    lvl = getattr(logging, log_level.upper())
+    logging.basicConfig(level=lvl)
+    logger.setLevel(lvl)
+
+    logger.info('Updating MV Polar Bears website')
 
     client, doc, sheet = get_client(keyfile)
     data = read_sheet(sheet) 
@@ -168,4 +180,20 @@ def build_site(keyfile):
     with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
         style_content = style_template.render()
         style_fp.write(style_content)
+
+    logger.info('Update complete')
+
+
+def update_cli():
+    """Command line interface to update MV Polar Bears website"""
+    ap = argparse.ArgumentParser(
+        description="Update MV Polar Bears website",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    ap.add_argument('google_key', help="Path to Google API key file")
+    ap.add_argument('--log_level', help='Log level to display',
+                    choices=['critical', 'error', 'warning', 'info', 'debug'],
+                    default='info')
+    args = ap.parse_args()
+
+    update(args.google_key, args.log_level) 
 
