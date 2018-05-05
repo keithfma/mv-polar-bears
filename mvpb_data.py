@@ -271,7 +271,7 @@ def add_missing_water(sheet):
     logger.info('Adding missing water conditions data')
 
     # constants
-    batch_size = 25 
+    batch_size = 50 
     water_col_names = [
         'WAVE-HEIGHT-METERS',
         'DOMINANT-WAVE-PERIOD-SECONDS',

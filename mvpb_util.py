@@ -65,10 +65,10 @@ def read_sheet(sheet):
         lambda x: dateutil.parser.parse(x).replace(tzinfo=US_EASTERN))
     content.set_index('DATETIME', drop=True, inplace=True)
 
-    # set unobserved to 0 for select columns
-    cols = ['GROUP', 'NEWBIES']
-    for col in cols:
-        content[col] = content[col].fillna(0)
+    # # set unobserved to 0 for select columns
+    # cols = ['GROUP', 'NEWBIES']
+    # for col in cols:
+    #     content[col] = content[col].fillna(0)
 
     return content
 

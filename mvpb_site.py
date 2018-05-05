@@ -158,13 +158,20 @@ def scatter_plot(data, xname, yname):
     """
     logger.info('Generating scatter plot, x = "{}", y = "{}"'.format(xname, yname))
 
+    # compute padded ranges
+    pad_frac = 0.025
+    xpad = pad_frac*(max(data[xname]) - min(data[xname]))
+    ypad = pad_frac*(max(data[yname]) - min(data[yname]))
+    xrng = (min(data[xname]) - xpad, max(data[xname]) + xpad)
+    yrng = (min(data[yname]) - ypad, max(data[yname]) + ypad)
+
     # create figure
     fig = bk_plt.figure(
         title="",
         x_axis_label=xname,
-        x_range=(min(data[xname]), max(data[xname])),
+        x_range=xrng,
         y_axis_label=yname,
-        y_range=(min(data[yname]), max(data[yname])),
+        y_range=yrng,
         plot_width=800,
         plot_height=600,
         match_aspect=True,
@@ -186,14 +193,6 @@ def scatter_plot(data, xname, yname):
     return bk_embed.components(fig)
 
 
-# TODO: write a lookup table for sheet column names, scattering them throughout
-#   is a maintenence disaster 
-
-# TODO: add week number as a data column
-
-# TODO: fill some unobserved cols with zeros (e.g., Group, newbies)
-
-
 def all_scatter_plots(data):
     """
     Generate scatter plots for all hard-coded variable pairs
@@ -207,14 +206,13 @@ def all_scatter_plots(data):
     """
     # constants
     xynames = [
-        ('GROUP', 'NEWBIES'),
-        ('GROUP', 'DAY-OF-WEEK'),
-        ('GROUP', 'AIR-TEMPERATURE-DEGREES-F'),
-        ('GROUP', 'HUMIDITY-PERCENT'),
-        ('GROUP', 'CLOUD-COVER-PERCENT'),
-        ('GROUP', 'PRECIP-PROBABILITY'),
-        ('GROUP', 'WIND-SPEED-MPH'),
-        ('GROUP', 'WAVE-HEIGHT-METERS'),
+        ('NEWBIES', 'GROUP'),
+        ('AIR-TEMPERATURE-DEGREES-F', 'GROUP'),
+        ('HUMIDITY-PERCENT', 'GROUP'),
+        # ('CLOUD-COVER-PERCENT', 'GROUP'),  # data does not appear reliable
+        ('PRECIP-PROBABILITY', 'GROUP'),
+        ('WIND-SPEED-MPH', 'GROUP'),
+        ('WAVE-HEIGHT-METERS', 'GROUP'),
         ]
 
     # generate all plots
