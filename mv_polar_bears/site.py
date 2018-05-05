@@ -144,6 +144,49 @@ def get_table_data(data):
     return table
 
 
+def scatter_plot(data, xname, yname):
+    """
+    Generate simple scatter plot for pair of variables
+
+    Arguments:
+        data: pandas dataframe
+        xname, yname: strings, column names for x and y variables in plot
+
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
+    """
+    logger.info('Generating scatter plot, x = "{}", y = "{}"'.format(xname, yname))
+
+    # create figure
+    fig = bk_plt.figure(
+        title="",
+        x_axis_label=xname,
+        x_range=(min(data[xname]), max(data[xname])),
+        y_axis_label=yname,
+        y_range=(min(data[yname]), max(data[yname])),
+        plot_width=800,
+        plot_height=600,
+        match_aspect=True,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+    
+    # add scatter plot
+    fig.circle(
+        data[xname], data[yname],
+        size=10,
+        color='orangered',
+        alpha=0.75,
+        )
+
+    # additional formatting
+    set_font_size(fig)
+
+    bk_plt.show(fig)
+    # return bk_embed.components(fig)
+
+
 def update(keyfile, log_level):
     """
     Get data and build static HTML / JS site
@@ -204,4 +247,12 @@ def update_cli():
     args = ap.parse_args()
 
     update(args.google_key, args.log_level) 
+
+
+# Development scratch space
+if __name__ == '__main__':
+    
+    # client, doc, sheet = get_client('~/.mv-polar-bears/google_secret.json')
+    # data = read_sheet(sheet)
+    scatter_plot(data, 'GROUP', 'NEWBIES')
 
