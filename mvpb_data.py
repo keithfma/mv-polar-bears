@@ -21,7 +21,7 @@ import pickle
 import numpy as np
 import argparse
 from pkg_resources import resource_filename
-from mv_polar_bears.util import get_client, read_sheet
+from mvpb_util import get_client, read_sheet
 
 # constants
 BUOY_NUM = '44020' # Buoy in Nantucket Sound
@@ -37,9 +37,6 @@ UTC = pytz.timezone('UTC')
 
 # init logging
 logger = logging.getLogger('mv-polar-bears')
-
-
-# TODO: use DATETIME column that is now returned by read_sheet
 
 
 def is_google_quota_error(err):
@@ -145,7 +142,7 @@ def add_missing_days(sheet):
 
     # ensure minimum daily frequency by adding empty rows as needed
     rid = 3 # 1-based index to google sheet row
-    prev_dt = parse_datetime(content.iloc[1]['DATE'], content.iloc[1]['TIME'])
+    prev_dt = content.iloc[1].name
     for ii in range(1, len(content)): # index to local copy
         row = content.iloc[ii]
 
@@ -156,7 +153,7 @@ def add_missing_days(sheet):
             continue
 
         # check for gap and fill it
-        curr_dt = parse_datetime(row['DATE'], row['TIME'])
+        curr_dt = row.name
         missing_days = (curr_dt - prev_dt).days - 1
         for jj in range(missing_days):
             day = prev_dt + timedelta(days=jj + 1)
@@ -198,7 +195,7 @@ def add_missing_dows(sheet):
     for ii in range(len(content)):
         row = content.iloc[ii]
         if pd.isnull(row['DAY-OF-WEEK']):
-            dt = parse_datetime(row['DATE'], row['TIME'])
+            dt = row.name
             dow = dt.strftime('%A')
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
             cell = gspread.models.Cell(sheet_row_idx, sheet_col_idx, dow)
@@ -242,7 +239,7 @@ def add_missing_weather(sheet, darksky_key):
         row = content.iloc[ii]
         if all(pd.isnull(row[weather_col_names])):
             # get weather
-            dt = parse_datetime(row['DATE'], row['TIME'])
+            dt = row.name
             weather_data = get_weather_conditions(key, dt=dt)
             # queue update for all missing cells
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
@@ -294,7 +291,7 @@ def add_missing_water(sheet):
         row = content.iloc[ii]
         if all(pd.isnull(row[water_col_names])):
             # get water conditions 
-            dt = parse_datetime(row['DATE'], row['TIME'])
+            dt = row.name
             water_data = get_water_conditions(dt, historical)
             if any([isinstance(x, str) and x.find('MM') != -1 for x in water_data.values()]):
                 set_trace()
@@ -533,7 +530,7 @@ def get_water_conditions(dt, historical):
         }
     for key, val in na_values.items():
         if out[key] == val:
-            out[key] == nan
+            out[key] = None 
 
     return out
 
