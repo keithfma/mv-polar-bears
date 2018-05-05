@@ -2,6 +2,8 @@
 Build static webpage exploring MV Polar Bears dataset
 """
 
+# TODO: include cumulative plots for total attendees and total num polar bears
+
 import os
 from mvpb_util import get_client, read_sheet
 from bokeh import plotting as bk_plt
