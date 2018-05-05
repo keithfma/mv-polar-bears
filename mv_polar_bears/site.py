@@ -15,6 +15,7 @@ from pkg_resources import resource_filename
 from pdb import set_trace
 import argparse
 import logging
+from datetime import datetime
 
 # constants
 TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
@@ -54,6 +55,8 @@ def daily_bar_plot(data):
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
+    logger.info('Generating daily bar plot')
+
     # create figure
     fig = bk_plt.figure(
         title="Daily Attendence",
@@ -89,6 +92,8 @@ def weekly_bar_plot(data):
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
+    logger.info('Generating weekly bar plot')
+
     # compute weekly sums
     weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
 
@@ -128,6 +133,8 @@ def get_table_data(data):
     Returns:
         list of dicts, each containing data for a single day, with no gaps
     """
+    logger.info('Generating summary table')
+
     table_data = data.replace(nan, '-')
     table_dict = table_data.T.to_dict()
     table = []
@@ -172,7 +179,8 @@ def update(keyfile, log_level):
             daily_bar_div=daily_bar_div,
             daily_bar_script=daily_bar_script,
             weekly_bar_div=weekly_bar_div,
-            weekly_bar_script=weekly_bar_script
+            weekly_bar_script=weekly_bar_script,
+            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             )
         index_fp.write(index_content)
 
