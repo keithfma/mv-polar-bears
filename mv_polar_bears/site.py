@@ -2,29 +2,27 @@
 Build static webpage exploring MV Polar Bears dataset
 """
 
+import os
+from mv_polar_bears.util import get_client, read_sheet
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
 import jinja2
+import pytz
+import dateutil
+from numpy import nan
+from pkg_resources import resource_filename
+from pdb import set_trace
 
-# plot format constants
+# constants
+TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
+WEBPAGE_TITLE = 'MV Polar Bears!'
+PUBLISH_DIR = 'docs'
 GROUP_COLOR = 'royalblue'
 NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '20pt'
 DAY_TO_MSEC = 60*60*24*1000
-
-# webpage constants
-WEBPAGE_TITLE = 'MV Polar Bears!'
-PUBLISH_DIR = 'docs'
-
-def add_dates(data):
-    """
-    Convert year, month, day columns to datetime.date objects
-
-    Return: Nothing, adds "DATE" column to dataframe
-    """
-    data['DATE'] = pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]).dt.date
-    data.set_index(pd.to_datetime(data[['YEAR', 'MONTH', 'DAY']]), inplace=True)
+US_EASTERN = pytz.timezone('US/Eastern')
 
 
 def set_font_size(fig):
@@ -64,10 +62,10 @@ def daily_bar_plot(data):
     
     # add bar plots
     fig.vbar(
-        x=data['DATE'], width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
+        x=data.index, width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
         color=GROUP_COLOR, legend='Group')
     fig.vbar(
-        x=data['DATE'], width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
+        x=data.index, width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
         color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
@@ -115,20 +113,6 @@ def weekly_bar_plot(data):
     return bk_embed.components(fig)
 
 
-def resample_to_daily(data):
-    """Resample input dataframe to daily resolution (initial cleaning step)"""
-    lookup_day = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
-    data = data.resample('D').mean() # daily frequency, no gaps
-    data['DATE'] = pd.Series(
-        {x: x.to_pydatetime().date() for x in data.index})
-    data['YEAR'] = data['DATE'].apply(lambda x: x.year)
-    data['MONTH'] = data['DATE'].apply(lambda x: x.month)
-    data['DAY'] = data['DATE'].apply(lambda x: x.day)
-    data['DAY-OF-WEEK'] = data['DATE'].apply(lambda x: lookup_day[x.weekday()])
-    data.set_index('DATE', drop=False, inplace=True)
-    return data
-
-
 def get_table_data(data):
     """
     Munge data to build a daily view of all available data
@@ -142,25 +126,29 @@ def get_table_data(data):
     table_data = data.replace(nan, '-')
     table_dict = table_data.T.to_dict()
     table = []
-    for date in sorted(table_data['DATE']):
+    for date in sorted(table_data.index):
         table.append(table_dict[date])
     table.sort(key=lambda x: x['DATE'], reverse=True)
     return table
 
 
-def build_site():
-    """Get/update data and build static HTML / JS site"""
+def build_site(keyfile):
+    """
+    Get data and build static HTML / JS site
+    
+    Arguments:
+        keyfile: Google Sheets API key
+    """
 
-    data = sheets_read_data()
-    add_dates(data)
-    data = resample_to_daily(data)
+    client, doc, sheet = get_client(keyfile)
+    data = read_sheet(sheet) 
     
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
 
     env = jinja2.Environment(
-        loader=jinja2.FileSystemLoader('templates'),
+        loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         autoescape=jinja2.select_autoescape(['html', 'css'])
         )
 
@@ -180,3 +168,4 @@ def build_site():
     with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
         style_content = style_template.render()
         style_fp.write(style_content)
+
