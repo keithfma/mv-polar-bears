@@ -18,9 +18,6 @@
       visualizations of this dataset. The site is refreshed daily to include
       the latest, greatest data. Enjoy! 
     </p>
-    <p>
-      Last Update: {{ last_update }}
-    </p>
 
     <div id="recent-data">
       <table>
@@ -44,6 +41,10 @@
 
     {{ daily_bar_div | safe }}
     {{ weekly_bar_div | safe }}
+
+    <p>
+      Last Update: {{ last_update }}
+    </p>
 
     <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
     <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
