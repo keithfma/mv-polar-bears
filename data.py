@@ -25,7 +25,8 @@ from mv_polar_bears.util import get_client, read_sheet
 
 # constants
 BUOY_NUM = '44020' # Buoy in Nantucket Sound
-DATA_DIR = resource_filename('mv_polar_bears', 'data')
+DATA_DIR = 'data'
+# TODO: don't bother with the pickle file
 BUOY_HISTORICAL = os.path.join(DATA_DIR, 'historical.pkl')
 LOG_LEVEL = logging.INFO
 GOOGLE_WAIT_SEC = 60
@@ -405,7 +406,6 @@ def _water_convert_type(val):
         # default case, do nothing 
         return val
 
-# TODO: automatically handle retrieving new data...
 
 def get_historical_water_conditions():
     """
@@ -561,8 +561,10 @@ def update(google_key, darksky_key, log_level):
     logger.info('Update complete')
 
 
-def update_cli():
-    """Command line interface to update MV Polar Bears data sheet"""
+# command line interface
+if __name__ == '__main__':
+
+    # command line
     ap = argparse.ArgumentParser(
         description="Update data in MV Polar Bears data sheet",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -573,5 +575,6 @@ def update_cli():
                     default='info')
     args = ap.parse_args()
 
+    # run 
     update(args.google_key, args.darksky_key, args.log_level) 
 

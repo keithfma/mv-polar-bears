@@ -183,8 +183,38 @@ def scatter_plot(data, xname, yname):
     # additional formatting
     set_font_size(fig)
 
-    bk_plt.show(fig)
-    # return bk_embed.components(fig)
+    return bk_embed.components(fig)
+
+
+# TODO: write a lookup table for sheet column names, scattering them throughout
+#   is a maintenence disaster 
+
+
+def all_scatter_plots(data):
+    """
+    Generate scatter plots for all hard-coded variable pairs
+
+    Arguments:
+        data: pandas dataframe
+
+    Returns: scripts, divs
+        scripts: list of scripts, each as returned by scatter_plot() 
+        divs: list of divs, each as returned by scatter_plot()
+    """
+    # constants
+    xynames = [
+        ('GROUP', 'NEWBIES'),
+        ]
+
+    # generate all plots
+    scripts = []
+    divs = []
+    for xyname in xynames:
+        script, div = scatter_plot(data, xyname[0], xyname[1])
+        scripts.append(script)
+        divs.append(div)
+
+    return scripts, divs
 
 
 def update(keyfile, log_level):
@@ -208,6 +238,7 @@ def update(keyfile, log_level):
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
+    scatter_scripts, scatter_divs = all_scatter_plots(data)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
@@ -223,7 +254,9 @@ def update(keyfile, log_level):
             daily_bar_script=daily_bar_script,
             weekly_bar_div=weekly_bar_div,
             weekly_bar_script=weekly_bar_script,
-            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            scatter_divs=scatter_divs,
+            scatter_scripts=scatter_scripts
             )
         index_fp.write(index_content)
 
@@ -235,8 +268,10 @@ def update(keyfile, log_level):
     logger.info('Update complete')
 
 
-def update_cli():
-    """Command line interface to update MV Polar Bears website"""
+# command line interface
+if __name__ == '__main__':
+    
+    # arguments
     ap = argparse.ArgumentParser(
         description="Update MV Polar Bears website",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -246,13 +281,5 @@ def update_cli():
                     default='info')
     args = ap.parse_args()
 
+    # run
     update(args.google_key, args.log_level) 
-
-
-# Development scratch space
-if __name__ == '__main__':
-    
-    # client, doc, sheet = get_client('~/.mv-polar-bears/google_secret.json')
-    # data = read_sheet(sheet)
-    scatter_plot(data, 'GROUP', 'NEWBIES')
-
