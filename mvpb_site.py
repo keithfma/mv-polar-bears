@@ -189,6 +189,10 @@ def scatter_plot(data, xname, yname):
 # TODO: write a lookup table for sheet column names, scattering them throughout
 #   is a maintenence disaster 
 
+# TODO: add week number as a data column
+
+# TODO: fill some unobserved cols with zeros (e.g., Group, newbies)
+
 
 def all_scatter_plots(data):
     """
@@ -204,6 +208,13 @@ def all_scatter_plots(data):
     # constants
     xynames = [
         ('GROUP', 'NEWBIES'),
+        ('GROUP', 'DAY-OF-WEEK'),
+        ('GROUP', 'AIR-TEMPERATURE-DEGREES-F'),
+        ('GROUP', 'HUMIDITY-PERCENT'),
+        ('GROUP', 'CLOUD-COVER-PERCENT'),
+        ('GROUP', 'PRECIP-PROBABILITY'),
+        ('GROUP', 'WIND-SPEED-MPH'),
+        ('GROUP', 'WAVE-HEIGHT-METERS'),
         ]
 
     # generate all plots
