@@ -55,6 +55,8 @@ def daily_bar_plot(data):
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
+    logger.info('Generating daily bar plot')
+
     # create figure
     fig = bk_plt.figure(
         title="Daily Attendence",
@@ -90,6 +92,8 @@ def weekly_bar_plot(data):
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
+    logger.info('Generating weekly bar plot')
+
     # compute weekly sums
     weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
 
@@ -129,6 +133,8 @@ def get_table_data(data):
     Returns:
         list of dicts, each containing data for a single day, with no gaps
     """
+    logger.info('Generating summary table')
+
     table_data = data.replace(nan, '-')
     table_dict = table_data.T.to_dict()
     table = []
