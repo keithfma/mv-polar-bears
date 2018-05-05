@@ -8,6 +8,7 @@ setup(
    entry_points={
        'console_scripts': [
            'mvpb-update-data = mv_polar_bears.data:update_cli',
+           'mvpb-update-site = mv_polar_bears.site:update_cli',
            ]
        }
    )

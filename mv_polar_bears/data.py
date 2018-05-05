@@ -38,11 +38,7 @@ UTC = pytz.timezone('UTC')
 logger = logging.getLogger('mv-polar-bears')
 
 
-def parse_datetime(date_str, time_str):
-    """Utility for parsing DATE and TIME columns to python datetime"""
-    dt = dateutil.parser.parse(date_str + ' ' + time_str) 
-    dt = dt.replace(tzinfo=US_EASTERN)
-    return dt    
+# TODO: use DATETIME column that is now returned by read_sheet
 
 
 def is_google_quota_error(err):
