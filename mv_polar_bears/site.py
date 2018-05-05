@@ -15,6 +15,7 @@ from pkg_resources import resource_filename
 from pdb import set_trace
 import argparse
 import logging
+from datetime import datetime
 
 # constants
 TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
@@ -172,7 +173,8 @@ def update(keyfile, log_level):
             daily_bar_div=daily_bar_div,
             daily_bar_script=daily_bar_script,
             weekly_bar_div=weekly_bar_div,
-            weekly_bar_script=weekly_bar_script
+            weekly_bar_script=weekly_bar_script,
+            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             )
         index_fp.write(index_content)
 
