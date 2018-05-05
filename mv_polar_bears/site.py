@@ -1,23 +1,11 @@
 """
-Scratch space for developing key functions before it is clear where they will
-live in the final package
+Build static webpage exploring MV Polar Bears dataset
 """
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import pandas as pd
-from numpy import nan
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
 import jinja2
-import os
-
-
-# config constants
-KEY_FILE = 'secret.json'
-DOC_TITLE = 'MV Polar Bears Attendence'
-SHEET_TITLE = 'Data'
 
 # plot format constants
 GROUP_COLOR = 'royalblue'
@@ -28,29 +16,6 @@ DAY_TO_MSEC = 60*60*24*1000
 # webpage constants
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
-
-
-def sheets_get_client(key_file):
-    """Return authenticated client for Google Sheets"""
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
-    creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
-    client = gspread.authorize(creds)
-    return client
-
-
-def sheets_read_data():
-    """
-    Read attendence data from Google Sheets
-
-    Return: pd dataframe containing current data
-    """
-    client = sheets_get_client(KEY_FILE)
-    doc = client.open(DOC_TITLE)
-    sheet = doc.worksheet(SHEET_TITLE)
-    content = sheet.get_all_records(default_blank=nan)
-    return pd.DataFrame(content)
-
 
 def add_dates(data):
     """
@@ -183,15 +148,15 @@ def get_table_data(data):
     return table
 
 
-# TODO: write command-line tool to build site
-if __name__ == '__main__':
+def build_site():
+    """Get/update data and build static HTML / JS site"""
 
-    # data = sheets_read_data()
-    # add_dates(data)
-    # data = resample_to_daily(data)
+    data = sheets_read_data()
+    add_dates(data)
+    data = resample_to_daily(data)
     
-    # daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    # weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
+    daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
 
     env = jinja2.Environment(
@@ -215,4 +180,3 @@ if __name__ == '__main__':
     with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
         style_content = style_template.render()
         style_fp.write(style_content)
-
