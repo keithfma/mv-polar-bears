@@ -3,7 +3,7 @@ Build static webpage exploring MV Polar Bears dataset
 """
 
 import os
-from mv_polar_bears.util import get_client, read_sheet
+from mvpb_util import get_client, read_sheet
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
@@ -18,7 +18,7 @@ import logging
 from datetime import datetime
 
 # constants
-TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
+TEMPLATES_DIR = 'templates'
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
 GROUP_COLOR = 'royalblue'
