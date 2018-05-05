@@ -19,6 +19,13 @@
       the latest, greatest data. Enjoy! 
     </p>
 
+    <h2>Snapshots of Recent Observations</h2>
+    
+    <p>
+      The table below shows the raw observed data, including attendence,
+      weather, and water conditions at the Inkwell beach.
+    </p>
+
     <div id="recent-data">
       <table>
           <tr id="recent-data-first-line">
@@ -39,8 +46,31 @@
       </table>
     </div>
 
+    <h2>Attendence Over Time</h2>
+
+    <p>
+      The next few plots show the number of new and returning attendees over
+      the past few years. There is a clear annual pattern, and always more old
+      friends than new ones.
+    </p>
+
     {{ daily_bar_div | safe }}
     {{ weekly_bar_div | safe }}
+
+    <h2>What Drives Attendence?</h2>
+
+    <p>
+      Two features are related if knowing the value of one feature tells you
+      something about the other. For example, the new and returning attendence
+      number are closely correlated -- when the group is bigger there are more
+      "newbies". Temperature and attendence show a different relation. Polar
+      bears don't sweat cold weather up to a point, and then attendence falls
+      off a cliff. Take a look and see what else you can find.
+    </p>
+
+    {% for scatter_div in scatter_divs %}
+    {{ scatter_div | safe }}
+    {% endfor %}
 
     <p>
       Last Update: {{ last_update }}
@@ -56,6 +86,9 @@
 
     {{ daily_bar_script | safe }}
     {{ weekly_bar_script | safe }}
+    {% for scatter_script in scatter_scripts %}
+    {{ scatter_script | safe }}
+    {% endfor %}
   </body>
 
 </html>

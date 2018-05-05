@@ -3,7 +3,7 @@ Build static webpage exploring MV Polar Bears dataset
 """
 
 import os
-from mv_polar_bears.util import get_client, read_sheet
+from mvpb_util import get_client, read_sheet
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
@@ -18,7 +18,7 @@ import logging
 from datetime import datetime
 
 # constants
-TEMPLATES_DIR = resource_filename('mv_polar_bears', 'templates')
+TEMPLATES_DIR = 'templates'
 WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
 GROUP_COLOR = 'royalblue'
@@ -144,6 +144,88 @@ def get_table_data(data):
     return table
 
 
+def scatter_plot(data, xname, yname):
+    """
+    Generate simple scatter plot for pair of variables
+
+    Arguments:
+        data: pandas dataframe
+        xname, yname: strings, column names for x and y variables in plot
+
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
+    """
+    logger.info('Generating scatter plot, x = "{}", y = "{}"'.format(xname, yname))
+
+    # compute padded ranges
+    pad_frac = 0.025
+    xpad = pad_frac*(max(data[xname]) - min(data[xname]))
+    ypad = pad_frac*(max(data[yname]) - min(data[yname]))
+    xrng = (min(data[xname]) - xpad, max(data[xname]) + xpad)
+    yrng = (min(data[yname]) - ypad, max(data[yname]) + ypad)
+
+    # create figure
+    fig = bk_plt.figure(
+        title="",
+        x_axis_label=xname,
+        x_range=xrng,
+        y_axis_label=yname,
+        y_range=yrng,
+        plot_width=800,
+        plot_height=600,
+        match_aspect=True,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+    
+    # add scatter plot
+    fig.circle(
+        data[xname], data[yname],
+        size=10,
+        color='orangered',
+        alpha=0.75,
+        )
+
+    # additional formatting
+    set_font_size(fig)
+
+    return bk_embed.components(fig)
+
+
+def all_scatter_plots(data):
+    """
+    Generate scatter plots for all hard-coded variable pairs
+
+    Arguments:
+        data: pandas dataframe
+
+    Returns: scripts, divs
+        scripts: list of scripts, each as returned by scatter_plot() 
+        divs: list of divs, each as returned by scatter_plot()
+    """
+    # constants
+    xynames = [
+        ('NEWBIES', 'GROUP'),
+        ('AIR-TEMPERATURE-DEGREES-F', 'GROUP'),
+        ('HUMIDITY-PERCENT', 'GROUP'),
+        # ('CLOUD-COVER-PERCENT', 'GROUP'),  # data does not appear reliable
+        ('PRECIP-PROBABILITY', 'GROUP'),
+        ('WIND-SPEED-MPH', 'GROUP'),
+        ('WAVE-HEIGHT-METERS', 'GROUP'),
+        ]
+
+    # generate all plots
+    scripts = []
+    divs = []
+    for xyname in xynames:
+        script, div = scatter_plot(data, xyname[0], xyname[1])
+        scripts.append(script)
+        divs.append(div)
+
+    return scripts, divs
+
+
 def update(keyfile, log_level):
     """
     Get data and build static HTML / JS site
@@ -165,6 +247,7 @@ def update(keyfile, log_level):
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
+    scatter_scripts, scatter_divs = all_scatter_plots(data)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
@@ -180,7 +263,9 @@ def update(keyfile, log_level):
             daily_bar_script=daily_bar_script,
             weekly_bar_div=weekly_bar_div,
             weekly_bar_script=weekly_bar_script,
-            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            scatter_divs=scatter_divs,
+            scatter_scripts=scatter_scripts
             )
         index_fp.write(index_content)
 
@@ -192,8 +277,10 @@ def update(keyfile, log_level):
     logger.info('Update complete')
 
 
-def update_cli():
-    """Command line interface to update MV Polar Bears website"""
+# command line interface
+if __name__ == '__main__':
+    
+    # arguments
     ap = argparse.ArgumentParser(
         description="Update MV Polar Bears website",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -203,5 +290,5 @@ def update_cli():
                     default='info')
     args = ap.parse_args()
 
+    # run
     update(args.google_key, args.log_level) 
-

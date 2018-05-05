@@ -2,6 +2,7 @@
 Shared utilites for MV Polar Bears project
 """
 
+import os
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from numpy import nan
@@ -35,6 +36,7 @@ def get_client(key_file):
         doc: gspread.models.Spreadsheet
         sheet: gspread.models.Worksheet
     """
+    key_file = os.path.expanduser(key_file)
     scope = ['https://spreadsheets.google.com/feeds',
              'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_name(key_file, scope)
@@ -62,6 +64,11 @@ def read_sheet(sheet):
     content['DATETIME'] = dt_text.apply(
         lambda x: dateutil.parser.parse(x).replace(tzinfo=US_EASTERN))
     content.set_index('DATETIME', drop=True, inplace=True)
+
+    # # set unobserved to 0 for select columns
+    # cols = ['GROUP', 'NEWBIES']
+    # for col in cols:
+    #     content[col] = content[col].fillna(0)
 
     return content
 

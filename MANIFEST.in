@@ -1,3 +1,0 @@
-include mv_polar_bears/data/*.txt
-include mv_polar_bears/templates/*.html
-include mv_polar_bears/templates/*.css
