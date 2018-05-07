@@ -99,8 +99,50 @@ trend, junk = model.fit()
 # TRY GARCH
 from arch import arch_model
 
+grp = data['GROUP0'].values
+mod = arch_model(grp, mean='ARX', lags=[1,3,5])
+res = mod.fit()
+print(res.summary())
+frc = res.forecast(start=4)
+
+t = data.index.values
+mean = frc.mean['h.1'].values
+std = np.sqrt(frc.variance['h.1'].values)
+
+plt.plot(t, grp, color='k')
+plt.plot(t, mean, color='b')
+plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
+plt.show()
+
+# # Works well over the fitted range -- Now try a rolling prediction...
+# 
 # grp = data['GROUP0'].values
 # mod = arch_model(grp, mean='ARX', lags=[1,3,5])
+# 
+# mean = np.zeros(len(data))
+# mean[:] = np.nan
+# 
+# std = np.zeros(len(data))
+# std[:] = np.nan
+# 
+# for ii in range(500, len(data)):
+#     print(ii)
+#     res = mod.fit(last_obs=ii+1, disp='off')
+#     frc = res.forecast(horizon=1)
+#     mean[ii] = frc.mean['h.1'][ii]
+#     std[ii] = np.sqrt(frc.variance['h.1'][ii])
+# 
+# t = data.index.values
+# plt.plot(t, grp, color='k')
+# # plt.plot(t, mean, color='b')
+# plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
+# plt.show()
+
+
+# # Any benefit to including weather data? -- Nope. Geez.
+# grp = data['GROUP0'].values
+# covar = data[['PRECIP-PROBABILITY', 'WIND-SPEED-MPH']].values
+# mod = arch_model(grp, covar, mean='ARX', lags=[1,3,5])
 # res = mod.fit()
 # print(res.summary())
 # frc = res.forecast(start=4)
@@ -114,27 +156,33 @@ from arch import arch_model
 # plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
 # plt.show()
 
-# Works well over the fitted range -- Now try a rolling prediction...
+# Model de-trended data as GARCH? --> worse!
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
+smooth = lowess(
+    endog=data['GROUP0'],
+    exog=data['DAY_IDX'],
+    frac=0.05, 
+    it=0,
+    return_sorted=False
+    )
+data['RESID'] = data['GROUP0'] - smooth
+
 
 grp = data['GROUP0'].values
-mod = arch_model(grp, mean='ARX', lags=[1,3,5])
-
-mean = np.zeros(len(data))
-mean[:] = np.nan
-
-std = np.zeros(len(data))
-std[:] = np.nan
-
-for ii in range(500, len(data)):
-    print(ii)
-    res = mod.fit(last_obs=ii+1, disp='off')
-    frc = res.forecast(horizon=1)
-    mean[ii] = frc.mean['h.1'][ii]
-    std[ii] = np.sqrt(frc.variance['h.1'][ii])
+resid = data['RESID'].values
+mod = arch_model(resid, mean='Zero')
+res = mod.fit()
+print(res.summary())
+frc = res.forecast(start=4)
 
 t = data.index.values
+mean_resid = frc.mean['h.1'].values
+mean = mean_resid + smooth
+std = np.sqrt(frc.variance['h.1'].values)
+
 plt.plot(t, grp, color='k')
-# plt.plot(t, mean, color='b')
+plt.plot(t, mean, color='b')
 plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
 plt.show()
 
