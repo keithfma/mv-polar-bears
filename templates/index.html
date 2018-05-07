@@ -19,6 +19,18 @@
       the latest, greatest data. Enjoy! 
     </p>
 
+    <h2>Forecast for tomorrow</h2>
+
+    <p>
+      The forecast for tomorrow's weather and attendence is:
+    </p>
+
+    <table id="forecast">
+      <tr>
+        <td> <em> Group:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }}</td>
+      </tr>
+    </table>
+
     <h2>Snapshots of Recent Observations</h2>
     
     <p>

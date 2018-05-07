@@ -266,12 +266,13 @@ def all_scatter_plots(data):
     return scripts, divs
 
 
-def update(keyfile, log_level):
+def update(google_keyfile, darksky_keyfile, log_level):
     """
     Get data and build static HTML / JS site
     
     Arguments:
-        keyfile: Google Sheets API key
+        google_keyfile: Google Sheets API key
+        darksky_keyfile: DarkSky API key
         log_level: string, logging level, one of 'critical', 'error',
             'warning', 'info', 'debug'
     """
@@ -281,12 +282,13 @@ def update(keyfile, log_level):
 
     logger.info('Updating MV Polar Bears website')
 
-    client, doc, sheet = get_client(keyfile)
+    client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
+    forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
 
     env = jinja2.Environment(
@@ -305,7 +307,8 @@ def update(keyfile, log_level):
             weekly_bar_script=weekly_bar_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             scatter_divs=scatter_divs,
-            scatter_scripts=scatter_scripts
+            scatter_scripts=scatter_scripts,
+            forecast=forecast_data
             )
         index_fp.write(index_content)
 
@@ -325,10 +328,11 @@ if __name__ == '__main__':
         description="Update MV Polar Bears website",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('google_key', help="Path to Google API key file")
+    ap.add_argument('darksky_key', help="Path to DarkSky API key file")
     ap.add_argument('--log_level', help='Log level to display',
                     choices=['critical', 'error', 'warning', 'info', 'debug'],
                     default='info')
     args = ap.parse_args()
 
     # run
-    update(args.google_key, args.log_level) 
+    update(args.google_key, args.darksky_key, args.log_level) 
