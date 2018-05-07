@@ -27,7 +27,13 @@
 
     <table id="forecast">
       <tr>
-        <td> <em> Group:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }}</td>
+        <td> <em> Group Attendence:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }}</td>
+      </tr>
+      <tr>
+	<td> <em> Air Temp (&deg;F) </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int }} </td> 
+      </tr>
+      <tr>
+        <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY'])*100|round|int }} &#37; </td> 
       </tr>
     </table>
 
