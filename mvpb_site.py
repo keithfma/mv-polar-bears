@@ -146,6 +146,20 @@ def get_table_data(data):
     return table
 
 
+def get_forecast_data():
+    """
+    Return forecast for attendence, weather, and water conditions
+    """
+    pass
+
+
+def forecast_plot():
+    """
+    Plot retrospective forecast mean, variance, and residuals
+    """
+    pass
+
+
 def scatter_plot(data, xname, yname):
     """
     Generate simple scatter plot for pair of variables
