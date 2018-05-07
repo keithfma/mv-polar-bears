@@ -13,20 +13,19 @@ import logging
 logger = logging.getLogger('mv-polar-bears')
 
 
-def get_model(sheet):
+def get_model(data):
     """
     Return GARCH model object including data and settings
     
     Arguments:
-        sheet: gspread sheet connected to dataset
+        data: pandas Dataframe read from sheet
     """
-    data = read_sheet(sheet)
     mod = arch_model(data['GROUP'].fillna(0).values, mean='ARX', lags=[1,3,5])
     return mod
 
 
 # TODO: include some performance metric
-def retrospective(sheet, first=500,  disp=100):
+def retrospective(data, first=500,  disp=100):
     """
     Return retrospective forecast for all timesteps in dataset
 
@@ -34,7 +33,7 @@ def retrospective(sheet, first=500,  disp=100):
     forecast. The forecast returns both mean (expected value) and variance.
 
     Arguments:
-        sheet: gspread sheet connected to dataset
+        data: pandas Dataframe read from sheet
         first: int, index of first timestep to forecast
         disp: int or None, interval for printing update message
     Returns: mean, std
@@ -44,7 +43,7 @@ def retrospective(sheet, first=500,  disp=100):
     logger.info('Retrospective forecast')
     
     # prepare model
-    mod = get_model(sheet)
+    mod = get_model(data)
 
     # allocate results vectors
     num_data = len(mod.y)
@@ -65,19 +64,19 @@ def retrospective(sheet, first=500,  disp=100):
     return mean, std
 
 
-def tomorrow(sheet):
+def tomorrow(data):
     """
     Return forecasted attendence for tomorrow
 
     Arguments:
-        sheet: gspread sheet connected to dataset
+        data: pandas Dataframe read from sheet
     Returns: mean, std
         mean: forecasted mean value
         std: forecasted standard deviation
     """
     logger.info('Tommorow forecast')
 
-    mod = get_model(sheet)
+    mod = get_model(data)
     res = mod.fit(disp='off')
     frc = res.forecast(horizon=2)
     mean = frc.mean['h.2'].values[-1]

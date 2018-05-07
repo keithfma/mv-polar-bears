@@ -6,6 +6,8 @@ Build static webpage exploring MV Polar Bears dataset
 
 import os
 from mvpb_util import get_client, read_sheet
+from mvpb_data import get_weather_conditions, get_water_conditions
+from mvpb_forecast import tomorrow as forecast_tomorrow
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
@@ -17,7 +19,8 @@ from pkg_resources import resource_filename
 from pdb import set_trace
 import argparse
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -146,11 +149,32 @@ def get_table_data(data):
     return table
 
 
-def get_forecast_data():
+def get_forecast_data(data, darksky_keyfile):
     """
     Return forecast for attendence, weather, and water conditions
     """
-    pass
+    # init time for next day
+    tomorrow = data.index[-1] + timedelta(days=1)
+
+    # get weather for tomorrow
+    with open(os.path.expanduser(darksky_keyfile), 'r') as fp:
+        darksky_key = json.load(fp)['secret_key']
+    weather = get_weather_conditions(darksky_key, dt=tomorrow)
+
+    # get water for tomorrow
+    water = get_water_conditions(tomorrow, None)
+
+    # get attendance for tomorrow
+    grp_mean, grp_std = forecast_tomorrow(data)
+
+    forecast = {
+        'GROUP': grp_mean,
+        'GROUP_STD': grp_std,
+        **weather,
+        **water,
+        }
+
+    return forecast
 
 
 def forecast_plot():
