@@ -3,220 +3,83 @@ Fit forecast model to MV Polar Bears dataset and predict next day attendence
 """
 
 from mvpb_util import get_client, read_sheet
-import mvpb_data
 from matplotlib import pyplot as plt
-from statsmodels.nonparametric.kernel_regression import KernelReg
 import pandas as pd
 import numpy as np
+from arch import arch_model
 
 # temporary
 import pickle
 from pdb import set_trace
 
+
+# TODO: switch from printing to logging
+
 # temporary constants, replace with arguments once wrapped as a function
 GKEY = '~/.mv-polar-bears/google_secret.json'
 
-# fetch data and do some post-processing
-# client, doc, sheet = get_client(GKEY)
-# data = read_sheet(sheet)
-with open('delete_me.pkl', 'rb') as fp:
-    data = pickle.load(fp)
-data['GROUP0'] = data['GROUP'].fillna(0)
-data = data.fillna(method='backfill')
-data['DAY_IDX'] = [int(x.strftime('%j')) for x in data.index]
-data['WEEK_IDX'] = [int(x.strftime('%U')) for x in data.index]
-data['TIME_IDX'] = range(len(data))
+
+def get_model(sheet):
+    """
+    Return GARCH model object including data and settings
+    
+    Arguments:
+        sheet: gspread sheet connected to dataset
+    """
+    # client, doc, sheet = get_client(GKEY)
+    # data = read_sheet(sheet)
+    with open('delete_me.pkl', 'rb') as fp:
+        data = pickle.load(fp)
+    mod = arch_model(data['GROUP'].fillna(0).values, mean='ARX', lags=[1,3,5])
+    return mod
 
 
-# remove trend with kernel regression
-covars = {
-    'AIR-TEMPERATURE-DEGREES-F': 20,
-    'DAY_IDX': 5,
-    # 'WEEK_IDX': 3,
-    # 'TIME_IDX': 10,
-    # 'PRECIP-PROBABILITY': 0.5,
-    # 'WIND-SPEED-MPH': 10,
-    'WAVE-HEIGHT-METERS': 1,
-    }
+def retrospective(sheet, disp=None):
+    """
+    Return retrospective forecast for all timesteps in dataset
 
-x = data[list(covars.keys())].values
-y = data['GROUP0'].values
-bw = list(covars.values())
+    For each timestep, train the model on all prior data and perform 1-step
+    forecast. The forecast returns both mean (expected value) and variance.
 
-model = KernelReg(y, x, 'c'*len(covars), bw=bw)
-trend, junk = model.fit()
+    Arguments:
+        sheet: gspread sheet connected to dataset
+        disp: int or None, interval for printing update message
+    Returns: mean, std
+        mean: forecasted mean value
+        std: forecasted standard deviation
+    """
+    mod = get_model(sheet)
 
-# plt.plot(y, label='truth', color='k');
-# plt.plot(trend, label='trend');
-# plt.legend();
-# plt.show()
+    # allocate results vectors
+    num_data = len(mod.y)
+    mean = np.zeros(num_data)
+    mean[:] = np.nan
+    std = np.zeros(num_data)
+    std[:] = np.nan
 
-# # try modeling the residuals
-# resid = y-trend
-# 
-# # crop data to in-season only
-# in_season = np.array([False]*len(data))
-# years = np.array([int(x.year) for x in data.index])
-# for year in np.unique(years):
-#     for idx, val in data['GROUP'].iteritems():
-#         print(idx, val)
-#     # year_data = [not pd.isnull(x) and y==year for x, y in zip(data['GROUP'], years)] 
-#     # year_data = data['GROUP'][years==year]
-#     # year_data = [not pd.isnull(x) and y==year for x, y in zip(data['GROUP'], years)] 
-#     # year_data = [not pd.isnull(x) and y==year for x, y in zip(data['GROUP'], years)] 
-#     # year_data = data['GROUP'][years==year]
-#     # year_data = year_data.loc[-pd.isnull(year_data)]
-#     # start_time = year_data.index[0]
-#     # end_time = year_data.index[-1]
-#     # start_idx = data.index.get_loc(start_time)
-#     # end_idx = data.index.get_loc(end_time)
-#     # in_season[start_idx:end_idx+1] = True
-#     # print('{} - {}'.format(start_time, end_time))
-#     # print('{} - {}'.format(start_idx, end_idx))
-#     # print('---')
+    # perform retrospective forecast at all timesteps
+    for ii in range(500, num_data):
+        if disp and ii % disp == 0:
+            print('Forecasting {} of {}'.format(ii, num_data))
+        res = mod.fit(last_obs=ii+1, disp='off')
+        frc = res.forecast(horizon=1)
+        mean[ii] = frc.mean['h.1'][ii]
+        std[ii] = np.sqrt(frc.variance['h.1'][ii])
+
+    return mean, std
 
 
-# # try a local model
-# idx =729 
-# rng = 15
-# 
-# # detrend with loess
-# from statsmodels.nonparametric.smoothers_lowess import lowess
-# 
-# smooth = lowess(
-#     endog=data['GROUP0'],
-#     exog=data['DAY_IDX'],
-#     frac=0.05, 
-#     it=1,
-#     return_sorted=False
-#     )
-# data['RESID'] = data['GROUP0'] - smooth
-# 
-# # get local data subset
-# sub = data.iloc[idx-rng:idx+rng]
+def tomorrow(sheet, disp=None):
+    pass
 
-
-# TRY GARCH
-from arch import arch_model
-
-grp = data['GROUP0'].values
-mod = arch_model(grp, mean='ARX', lags=[1,3,5])
-res = mod.fit()
-print(res.summary())
-frc = res.forecast(start=4)
-
-t = data.index.values
-mean = frc.mean['h.1'].values
-std = np.sqrt(frc.variance['h.1'].values)
-
-plt.plot(t, grp, color='k')
-plt.plot(t, mean, color='b')
-plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
-plt.show()
-
-# # Works well over the fitted range -- Now try a rolling prediction...
-# 
-# grp = data['GROUP0'].values
-# mod = arch_model(grp, mean='ARX', lags=[1,3,5])
-# 
-# mean = np.zeros(len(data))
-# mean[:] = np.nan
-# 
-# std = np.zeros(len(data))
-# std[:] = np.nan
-# 
-# for ii in range(500, len(data)):
-#     print(ii)
-#     res = mod.fit(last_obs=ii+1, disp='off')
-#     frc = res.forecast(horizon=1)
-#     mean[ii] = frc.mean['h.1'][ii]
-#     std[ii] = np.sqrt(frc.variance['h.1'][ii])
-# 
 # t = data.index.values
 # plt.plot(t, grp, color='k')
 # # plt.plot(t, mean, color='b')
 # plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
 # plt.show()
 
+# command line interface
+if __name__ == '__main__':
 
-# # Any benefit to including weather data? -- Nope. Geez.
-# grp = data['GROUP0'].values
-# covar = data[['PRECIP-PROBABILITY', 'WIND-SPEED-MPH']].values
-# mod = arch_model(grp, covar, mean='ARX', lags=[1,3,5])
-# res = mod.fit()
-# print(res.summary())
-# frc = res.forecast(start=4)
-# 
-# t = data.index.values
-# mean = frc.mean['h.1'].values
-# std = np.sqrt(frc.variance['h.1'].values)
-# 
-# plt.plot(t, grp, color='k')
-# plt.plot(t, mean, color='b')
-# plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
-# plt.show()
-
-# Model de-trended data as GARCH? --> worse!
-from statsmodels.nonparametric.smoothers_lowess import lowess
-
-smooth = lowess(
-    endog=data['GROUP0'],
-    exog=data['DAY_IDX'],
-    frac=0.05, 
-    it=0,
-    return_sorted=False
-    )
-data['RESID'] = data['GROUP0'] - smooth
-
-
-grp = data['GROUP0'].values
-resid = data['RESID'].values
-mod = arch_model(resid, mean='Zero')
-res = mod.fit()
-print(res.summary())
-frc = res.forecast(start=4)
-
-t = data.index.values
-mean_resid = frc.mean['h.1'].values
-mean = mean_resid + smooth
-std = np.sqrt(frc.variance['h.1'].values)
-
-plt.plot(t, grp, color='k')
-plt.plot(t, mean, color='b')
-plt.fill_between(t, mean-std, mean+std, facecolor='b', alpha=0.5)
-plt.show()
-
-# fig1 = plt.figure()
-# plt.plot(resid, label='residuals')
-# plt.title('Kernal Residuals')
-# 
-# from statsmodels.tsa.arima_model import ARIMA
-# model = ARIMA(resid, order=(3,0,0))
-# model_fit = model.fit(disp=0)
-# print(model_fit.summary())
-# # plot residual errors
-# fig2 = plt.figure()
-# residuals = pd.DataFrame(model_fit.resid)
-# residuals.plot()
-# plt.title('ARIMA Residuals')
-# print(residuals.describe())
-# 
-# plt.show()
-
-# rolling prediction
-if False:
-    predict = []
-    for ii in range(1, len(data)-1):
-        print('{} of {}'.format(ii, len(data)))
-        model = KernelReg(y[:ii], x[:ii,:], 'c'*len(covars), bw=bw)
-        # val = np.asscalar(model.fit(x[ii+1,:])[0])
-        val = np.asscalar(model.fit(x[ii,:])[0])
-        predict.append(val)
-
-
-    plt.plot(y[2:], label='truth', color='k');
-    plt.plot(predict, label='predict');
-    plt.legend();
-    plt.show()
-
+    mean, std = retrospective(None, 10)
 
