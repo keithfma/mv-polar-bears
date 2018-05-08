@@ -8,6 +8,7 @@ import os
 from mvpb_util import get_client, read_sheet
 from mvpb_data import get_weather_conditions, get_water_conditions
 from mvpb_forecast import tomorrow as forecast_tomorrow
+from mvpb_forecast import retrospective as forecast_retrospective
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
@@ -194,15 +195,14 @@ def forecast_plot(time, obs, pred_mean, pred_std):
         title="Retrospective Attendance Forecast",
         x_axis_label='Date',
         x_axis_type='datetime',
-        y_axis_label='Total # Attendees',
+        y_axis_label='# Attendees',
+        x_range=(min(time), max(time)),
         plot_width=1700,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
 
     # generate forecast plot
-    patch_x = np.append(time, time[::-1])
-    patch_y = np.append(upper_bound, lower_bound[::-1])
     fig_a.line(time, obs,
         legend='Observed',
         line_color='mediumblue',
@@ -213,6 +213,8 @@ def forecast_plot(time, obs, pred_mean, pred_std):
         line_color='forestgreen',
         line_width=1
         )
+    patch_x = np.append(time, time[::-1])
+    patch_y = np.append(upper_bound, lower_bound[::-1])
     fig_a.patch(patch_x, patch_y,
         legend='Predicted, Margin of Error (1-sigma)',
         color='forestgreen',
@@ -228,13 +230,22 @@ def forecast_plot(time, obs, pred_mean, pred_std):
         title="Attendance Forecast Error",
         x_axis_label='Date',
         x_axis_type='datetime',
-        y_axis_label='Error in Forecast # Attendees',
+        y_axis_label='# Attendees',
+        x_range=(min(time), max(time)),
         plot_width=1700,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
+    fig_b.line(time, obs - pred_mean,
+        legend='Prediction Error (Observed - Predicted)',
+        line_color='red',
+        line_width=2
+        )
 
-    bk_plt.show(bk_layouts.column(fig_a, fig_b))
+    # additional formatting
+    set_font_size(fig_b)
+
+    return bk_embed.components(bk_layouts.column(fig_a, fig_b))
 
 
 def scatter_plot(data, xname, yname):
@@ -302,7 +313,6 @@ def all_scatter_plots(data):
         ('NEWBIES', 'GROUP'),
         ('AIR-TEMPERATURE-DEGREES-F', 'GROUP'),
         ('HUMIDITY-PERCENT', 'GROUP'),
-        # ('CLOUD-COVER-PERCENT', 'GROUP'),  # data does not appear reliable
         ('PRECIP-PROBABILITY', 'GROUP'),
         ('WIND-SPEED-MPH', 'GROUP'),
         ('WAVE-HEIGHT-METERS', 'GROUP'),
@@ -343,6 +353,11 @@ def update(google_keyfile, darksky_keyfile, log_level):
     daily_table = get_table_data(data)
     forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
+    
+    time = data.index.values
+    obs = data['GROUP'].fillna(0).values
+    mean, std = forecast_retrospective(data, first=350)
+    forecast_script, forecast_div = forecast_plot(time, obs, mean, std)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
@@ -361,7 +376,9 @@ def update(google_keyfile, darksky_keyfile, log_level):
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             scatter_divs=scatter_divs,
             scatter_scripts=scatter_scripts,
-            forecast=forecast_data
+            forecast=forecast_data,
+            forecast_div=forecast_div,
+            forecast_script=forecast_script,
             )
         index_fp.write(index_content)
 

@@ -113,13 +113,18 @@
       model that predicts changes in the mean and volitility (specifically a
       GARCH model with an ARX mean). The plot below shows retrospecitve
       predictions for the attendence dataset (top), as well as the prediction
-      errors (bottom). You may notice that the prediction is often pretty
-      wrong, but the true number is usually within the (1-sigma) margin of
+      errors (bottom).
+    </p>
+    <p>
+      You may notice that the prediction is often <em>really</em> wrong. Like I
+      said, it is hard to predict polar bears! The volitility prediction works
+      better -- the true number is usually within the (1-sigma) margin of
       error. 
     </p>
     <p>
       This same model drives the forecast at the top of the page.
     </p>
+    {{ forecast_div | safe }}
 
     <p>
       Last Update: {{ last_update }}
@@ -138,6 +143,7 @@
     {% for scatter_script in scatter_scripts %}
     {{ scatter_script | safe }}
     {% endfor %}
+    {{ forecast_script | safe }}
   </body>
 
 </html>
