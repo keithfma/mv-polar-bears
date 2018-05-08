@@ -19,13 +19,19 @@ h2 {
 
 p {
   width: 80%;
-  margin: 0 auto;
+  margin: 10px auto;
 }
 
 table {
   font-size: 20px;
   border-spacing: 20px;
   border-collapse: collapse;
+}
+
+#forecast {
+  width: 30%;
+  margin: auto;
+  background-color: white;
 }
 
 #recent-data-first-line {

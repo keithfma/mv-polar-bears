@@ -2,11 +2,17 @@
 Build static webpage exploring MV Polar Bears dataset
 """
 
+# TODO: include cumulative plots for total attendees and total num polar bears
+
 import os
 from mvpb_util import get_client, read_sheet
+from mvpb_data import get_weather_conditions, get_water_conditions
+from mvpb_forecast import tomorrow as forecast_tomorrow
+from mvpb_forecast import retrospective as forecast_retrospective
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
+from bokeh import layouts as bk_layouts
 import jinja2
 import pytz
 import dateutil
@@ -15,7 +21,9 @@ from pkg_resources import resource_filename
 from pdb import set_trace
 import argparse
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+import json
+import numpy as np
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -144,6 +152,102 @@ def get_table_data(data):
     return table
 
 
+def get_forecast_data(data, darksky_keyfile):
+    """
+    Return forecast for attendence, weather, and water conditions
+    """
+    # init time for next day
+    tomorrow = data.index[-1] + timedelta(days=1)
+
+    # get weather for tomorrow
+    with open(os.path.expanduser(darksky_keyfile), 'r') as fp:
+        darksky_key = json.load(fp)['secret_key']
+    weather = get_weather_conditions(darksky_key, dt=tomorrow)
+
+    # get water for tomorrow
+    water = get_water_conditions(tomorrow, None)
+
+    # get attendance for tomorrow
+    grp_mean, grp_std = forecast_tomorrow(data)
+
+    forecast = {
+        'GROUP': grp_mean,
+        'GROUP_STD': grp_std,
+        **weather,
+        **water,
+        }
+
+    return forecast
+
+
+def forecast_plot(time, obs, pred_mean, pred_std):
+    """
+    Plot retrospective forecast mean, variance, and residuals
+    """
+    upper_bound = pred_mean + pred_std
+    lower_bound = pred_mean - pred_std
+    pred_mean[pred_mean < 0] = 0
+    upper_bound[upper_bound < 0] = 0
+    lower_bound[lower_bound < 0] = 0
+
+    # create figure for forecast
+    fig_a = bk_plt.figure(
+        title="Retrospective Attendance Forecast",
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='# Attendees',
+        x_range=(min(time), max(time)),
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+
+    # generate forecast plot
+    fig_a.line(time, obs,
+        legend='Observed',
+        line_color='mediumblue',
+        line_width=2
+        )
+    fig_a.line(time, pred_mean,
+        legend='Predicted',
+        line_color='forestgreen',
+        line_width=1
+        )
+    patch_x = np.append(time, time[::-1])
+    patch_y = np.append(upper_bound, lower_bound[::-1])
+    fig_a.patch(patch_x, patch_y,
+        legend='Predicted, Margin of Error (1-sigma)',
+        color='forestgreen',
+        fill_alpha=0.5,
+        line_alpha=0
+        )
+
+    # additional formatting
+    set_font_size(fig_a)
+
+    # create figure for forecast
+    fig_b = bk_plt.figure(
+        title="Attendance Forecast Error",
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='# Attendees',
+        x_range=(min(time), max(time)),
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+    fig_b.line(time, obs - pred_mean,
+        legend='Prediction Error (Observed - Predicted)',
+        line_color='red',
+        line_width=2
+        )
+
+    # additional formatting
+    set_font_size(fig_b)
+
+    return bk_embed.components(bk_layouts.column(fig_a, fig_b))
+
+
 def scatter_plot(data, xname, yname):
     """
     Generate simple scatter plot for pair of variables
@@ -209,7 +313,6 @@ def all_scatter_plots(data):
         ('NEWBIES', 'GROUP'),
         ('AIR-TEMPERATURE-DEGREES-F', 'GROUP'),
         ('HUMIDITY-PERCENT', 'GROUP'),
-        # ('CLOUD-COVER-PERCENT', 'GROUP'),  # data does not appear reliable
         ('PRECIP-PROBABILITY', 'GROUP'),
         ('WIND-SPEED-MPH', 'GROUP'),
         ('WAVE-HEIGHT-METERS', 'GROUP'),
@@ -226,12 +329,13 @@ def all_scatter_plots(data):
     return scripts, divs
 
 
-def update(keyfile, log_level):
+def update(google_keyfile, darksky_keyfile, log_level):
     """
     Get data and build static HTML / JS site
     
     Arguments:
-        keyfile: Google Sheets API key
+        google_keyfile: Google Sheets API key
+        darksky_keyfile: DarkSky API key
         log_level: string, logging level, one of 'critical', 'error',
             'warning', 'info', 'debug'
     """
@@ -241,13 +345,19 @@ def update(keyfile, log_level):
 
     logger.info('Updating MV Polar Bears website')
 
-    client, doc, sheet = get_client(keyfile)
+    client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
+    forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
+    
+    time = data.index.values
+    obs = data['GROUP'].fillna(0).values
+    mean, std = forecast_retrospective(data, first=350)
+    forecast_script, forecast_div = forecast_plot(time, obs, mean, std)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
@@ -265,7 +375,10 @@ def update(keyfile, log_level):
             weekly_bar_script=weekly_bar_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             scatter_divs=scatter_divs,
-            scatter_scripts=scatter_scripts
+            scatter_scripts=scatter_scripts,
+            forecast=forecast_data,
+            forecast_div=forecast_div,
+            forecast_script=forecast_script,
             )
         index_fp.write(index_content)
 
@@ -285,10 +398,11 @@ if __name__ == '__main__':
         description="Update MV Polar Bears website",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('google_key', help="Path to Google API key file")
+    ap.add_argument('darksky_key', help="Path to DarkSky API key file")
     ap.add_argument('--log_level', help='Log level to display',
                     choices=['critical', 'error', 'warning', 'info', 'debug'],
                     default='info')
     args = ap.parse_args()
 
     # run
-    update(args.google_key, args.log_level) 
+    update(args.google_key, args.darksky_key, args.log_level) 
