@@ -11,6 +11,7 @@ from mvpb_forecast import tomorrow as forecast_tomorrow
 from bokeh import plotting as bk_plt
 from bokeh import models as bk_model
 from bokeh import embed as bk_embed
+from bokeh import layouts as bk_layouts
 import jinja2
 import pytz
 import dateutil
@@ -21,6 +22,7 @@ import argparse
 import logging
 from datetime import datetime, timedelta
 import json
+import numpy as np
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -177,11 +179,62 @@ def get_forecast_data(data, darksky_keyfile):
     return forecast
 
 
-def forecast_plot():
+def forecast_plot(time, obs, pred_mean, pred_std):
     """
     Plot retrospective forecast mean, variance, and residuals
     """
-    pass
+    upper_bound = pred_mean + pred_std
+    lower_bound = pred_mean - pred_std
+    pred_mean[pred_mean < 0] = 0
+    upper_bound[upper_bound < 0] = 0
+    lower_bound[lower_bound < 0] = 0
+
+    # create figure for forecast
+    fig_a = bk_plt.figure(
+        title="Retrospective Attendance Forecast",
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='Total # Attendees',
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+
+    # generate forecast plot
+    patch_x = np.append(time, time[::-1])
+    patch_y = np.append(upper_bound, lower_bound[::-1])
+    fig_a.line(time, obs,
+        legend='Observed',
+        line_color='mediumblue',
+        line_width=2
+        )
+    fig_a.line(time, pred_mean,
+        legend='Predicted',
+        line_color='forestgreen',
+        line_width=1
+        )
+    fig_a.patch(patch_x, patch_y,
+        legend='Predicted, Margin of Error (1-sigma)',
+        color='forestgreen',
+        fill_alpha=0.5,
+        line_alpha=0
+        )
+
+    # additional formatting
+    set_font_size(fig_a)
+
+    # create figure for forecast
+    fig_b = bk_plt.figure(
+        title="Attendance Forecast Error",
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='Error in Forecast # Attendees',
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+
+    bk_plt.show(bk_layouts.column(fig_a, fig_b))
 
 
 def scatter_plot(data, xname, yname):
