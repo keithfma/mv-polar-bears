@@ -19,7 +19,7 @@
       the latest, greatest data. Enjoy! 
     </p>
 
-    <h2>Forecast for tomorrow</h2>
+    <h2>Forecast for Tomorrow</h2>
 
     <p>
       The forecast for tomorrow's weather and attendence is:
@@ -27,13 +27,21 @@
 
     <table id="forecast">
       <tr>
-        <td> <em> Group Attendence:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }}</td>
+        <td> <em> Group Attendence:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }} people </td>
       </tr>
       <tr>
-	<td> <em> Air Temp (&deg;F) </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int }} </td> 
+        <td> <em> Air Temp: </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int }} &deg;F </td> 
       </tr>
       <tr>
         <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY'])*100|round|int }} &#37; </td> 
+      </tr>
+      <tr>
+        <td> <em> Humidity: </em> </td> <td> {{ forecast['HUMIDITY'] }} &#37; </td>
+      <tr>
+        <td> <em>  Wind Speed: </em> </td> <td> {{ "%.1f"|format(forecast['WIND-SPEED-MPH']) }} MPH </td>
+      </tr>
+      <tr>
+        <td> <em> Wave Height </em> </td> <td> {{ "%.1f"|format(forecast['WAVE-HEIGHT-METERS']*3.28) }} ft </td>
       </tr>
     </table>
 
@@ -89,6 +97,29 @@
     {% for scatter_div in scatter_divs %}
     {{ scatter_div | safe }}
     {% endfor %}
+
+    <h2> Forecast Model </h2>
+
+    <p>
+      Polar bears are hard to predict! You may notice from the plots above that
+      attendence varies wildly from day-to-day, and the magnitude of this
+      variation changes over time as well. These features make make building a
+      predictor tricky. Moreover, I had hoped that the weather and water
+      conditions might help to predict attendence, but it seems that Polar
+      Bears aren'y much bothered by cold, wind, or rain. 
+    </p>
+    <p>
+      After a bit of experimentation, I landed on a timeseries forecasting
+      model that predicts changes in the mean and volitility (specifically a
+      GARCH model with an ARX mean). The plot below shows retrospecitve
+      predictions for the attendence dataset (top), as well as the prediction
+      errors (bottom). You may notice that the prediction is often pretty
+      wrong, but the true number is usually within the (1-sigma) margin of
+      error. 
+    </p>
+    <p>
+      This same model drives the forecast at the top of the page.
+    </p>
 
     <p>
       Last Update: {{ last_update }}
