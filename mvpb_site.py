@@ -366,7 +366,6 @@ def update(google_keyfile, darksky_keyfile, log_level):
     data = read_sheet(sheet) 
     
     cumul_script, cumul_div = cumul_bears_plot(data)
-    recent_bar_script, recent_bar_div = daily_bar_plot(data, 21)
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     daily_table = get_table_data(data)
     forecast_data = get_forecast_data(data, darksky_keyfile)
@@ -387,7 +386,6 @@ def update(google_keyfile, darksky_keyfile, log_level):
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
             daily_table=daily_table,
-            recent_bar_script=recent_bar_script, recent_bar_div=recent_bar_div,
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
             cumul_div=cumul_div, cumul_script=cumul_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
