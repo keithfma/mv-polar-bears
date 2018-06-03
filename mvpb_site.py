@@ -142,56 +142,6 @@ def cumul_bears_plot(data):
     return bk_embed.components(fig)
 
 
-def attend_ratio_plot(data):
-    """
-    Arguments:
-        data: pandas dataframe
-
-    Returns: script, div
-        script: javascript function controlling plot, wrapped in <script> HTML tags
-        div: HTML <div> modified by javascript to show plot
-    """
-    logger.info('Generating attendence ratio plot')
-
-    # create figure
-    fig = bk_plt.figure(
-        title='Attendence Ratios',
-        x_axis_label='Date',
-        x_axis_type='datetime',
-        y_axis_label='Percentage',
-        plot_width=1700,
-        tools="pan,wheel_zoom,box_zoom,reset",
-        logo=None
-        )
-
-    # compute newbie fraction
-    time = data.index.values
-    grp = data['GROUP'].fillna(0)
-    newb = data['NEWBIES'].fillna(0)
-    newb_frac = newb/grp
-
-    # compute total fraction
-    total_frac = grp/newb.cumsum()
-
-    # create plot
-    fig.line(time, newb_frac*100,
-        legend='Percentage Newbies in Attendence',
-        line_color=NEWBIES_COLOR,
-        line_width=3
-        )
-    fig.line(time[1:], total_frac[1:]*100,
-        legend='Percentage of All Polar Bears in Attendence',
-        line_color=GROUP_COLOR,
-        line_width=3
-        )
-
-    # additional formatting
-    set_font_size(fig)
-    set_ylabel_to_positive(fig)
-
-    bk_plt.show(fig)
-    return None, None
-
 def get_table_data(data):
     """
     Munge data to build a daily view of all available data
@@ -415,14 +365,12 @@ def update(google_keyfile, darksky_keyfile, log_level):
     daily_table = get_table_data(data)
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     cumul_script, cumul_div = cumul_bears_plot(data)
-    ratio_script, ratio_div = attend_ratio_plot(data)
-    return
     forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
 
     time = data.index.values
     obs = data['GROUP'].fillna(0).values
-    mean, std = forecast_retrospective(data, first=1400)
+    mean, std = forecast_retrospective(data, first=400)
     forecast_script, forecast_div = forecast_plot(time, obs, mean, std)
 
     env = jinja2.Environment(
