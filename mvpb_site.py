@@ -24,6 +24,7 @@ import logging
 from datetime import datetime, timedelta
 import json
 import numpy as np
+import pandas as pd
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -54,16 +55,29 @@ def set_ylabel_to_positive(fig):
     fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
-def daily_bar_plot(data):
+def format_legend(fig):
+    """Simple legend formatting"""
+    fig.legend.location = "top_left"
+
+
+def daily_bar_plot(data, limit=None):
     """
     Arguments:
         data: pandas dataframe
+        limit: int, max number of results to include, set None to include all
 
     Returns: script, div
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
     logger.info('Generating daily bar plot')
+
+    # truncate data, if requested
+    if not limit:
+        limit = 0
+    time = data.index[-limit:]
+    grp = data['GROUP'][-limit:]
+    newb = data['NEWBIES'][-limit:]
 
     # create figure
     fig = bk_plt.figure(
@@ -78,20 +92,21 @@ def daily_bar_plot(data):
     
     # add bar plots
     fig.vbar(
-        x=data.index, width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
+        x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
         color=GROUP_COLOR, legend='Group')
     fig.vbar(
-        x=data.index, width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
+        x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
         color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
     set_font_size(fig)
     set_ylabel_to_positive(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
 
-def weekly_bar_plot(data):
+def cumul_bears_plot(data):
     """
     Arguments:
         data: pandas dataframe
@@ -100,33 +115,36 @@ def weekly_bar_plot(data):
         script: javascript function controlling plot, wrapped in <script> HTML tags
         div: HTML <div> modified by javascript to show plot
     """
-    logger.info('Generating weekly bar plot')
-
-    # compute weekly sums
-    weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
+    logger.info('Generating cumulative bears plot')
 
     # create figure
     fig = bk_plt.figure(
-        title="Weekly Attendence",
-        x_axis_label='Week Start Date',
+        title='Cumulative Number of Polar Bears',
+        x_axis_label='Date',
         x_axis_type='datetime',
-        y_axis_label='Total # Attendees',
+        y_axis_label='# Polar Bears',
         plot_width=1700,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
+
+    # prep data
+    time = data.index.values
+    grp = data['GROUP'].fillna(0).cumsum()
+    newb = data['NEWBIES'].fillna(0).cumsum()
     
-    # add bar plots
+    # plot bars
     fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=0, top=weekly['GROUP'],
+        x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
         color=GROUP_COLOR, legend='Group')
     fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=-weekly['NEWBIES'], top=0,
+        x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
         color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
     set_font_size(fig)
     set_ylabel_to_positive(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
@@ -143,12 +161,15 @@ def get_table_data(data):
     """
     logger.info('Generating summary table')
 
-    table_data = data.replace(nan, '-')
-    table_dict = table_data.T.to_dict()
+    table_dict = data.T.to_dict()
     table = []
-    for date in sorted(table_data.index):
+    for date in sorted(data.index):
         table.append(table_dict[date])
     table.sort(key=lambda x: x['DATE'], reverse=True)
+    for ii in range(len(table)):
+        for k, v in table[ii].items():
+            if pd.isnull(v):
+                table[ii][k] = None
     return table
 
 
@@ -184,14 +205,11 @@ def forecast_plot(time, obs, pred_mean, pred_std):
     """
     Plot retrospective forecast mean, variance, and residuals
     """
-    try:
-        upper_bound = pred_mean + pred_std
-        lower_bound = pred_mean - pred_std
-        pred_mean[pred_mean < 0] = 0
-        upper_bound[upper_bound < 0] = 0
-        lower_bound[lower_bound < 0] = 0
-    except:
-        set_trace()
+    upper_bound = pred_mean + pred_std
+    lower_bound = pred_mean - pred_std
+    pred_mean[pred_mean < 0] = 0
+    upper_bound[upper_bound < 0] = 0
+    lower_bound[lower_bound < 0] = 0
 
     # create figure for forecast
     fig_a = bk_plt.figure(
@@ -227,6 +245,7 @@ def forecast_plot(time, obs, pred_mean, pred_std):
 
     # additional formatting
     set_font_size(fig_a)
+    format_legend(fig_a)
 
     # create figure for forecast
     fig_b = bk_plt.figure(
@@ -247,6 +266,7 @@ def forecast_plot(time, obs, pred_mean, pred_std):
 
     # additional formatting
     set_font_size(fig_b)
+    format_legend(fig_b)
 
     return bk_embed.components(bk_layouts.column(fig_a, fig_b))
 
@@ -296,6 +316,7 @@ def scatter_plot(data, xname, yname):
 
     # additional formatting
     set_font_size(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
@@ -351,15 +372,15 @@ def update(google_keyfile, darksky_keyfile, log_level):
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
-    daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
+    daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    cumul_script, cumul_div = cumul_bears_plot(data)
     forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
-    
+
     time = data.index.values
     obs = data['GROUP'].fillna(0).values
-    mean, std = forecast_retrospective(data, first=350)
+    mean, std = forecast_retrospective(data, first=400)
     forecast_script, forecast_div = forecast_plot(time, obs, mean, std)
 
     env = jinja2.Environment(
@@ -372,16 +393,12 @@ def update(google_keyfile, darksky_keyfile, log_level):
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
             daily_table=daily_table,
-            daily_bar_div=daily_bar_div,
-            daily_bar_script=daily_bar_script,
-            weekly_bar_div=weekly_bar_div,
-            weekly_bar_script=weekly_bar_script,
+            daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
+            cumul_div=cumul_div, cumul_script=cumul_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            scatter_divs=scatter_divs,
-            scatter_scripts=scatter_scripts,
+            scatter_divs=scatter_divs, scatter_scripts=scatter_scripts,
             forecast=forecast_data,
-            forecast_div=forecast_div,
-            forecast_script=forecast_script,
+            forecast_div=forecast_div, forecast_script=forecast_script,
             )
         index_fp.write(index_content)
 

@@ -33,13 +33,13 @@
         <td> <em> Air Temp: </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int if forecast['AIR-TEMPERATURE-DEGREES-F'] != None else "-" }} &deg;F </td> 
       </tr>
       <tr>
-        <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY'])*100|round|int if forecast['PRECIP-PROBABILITY'] != None else "-" }} &#37; </td> 
+        <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY']*100)|round|int if forecast['PRECIP-PROBABILITY'] != None else "-" }} &#37; </td> 
       </tr>
       <tr>
-        <td> <em> Humidity: </em> </td> <td> {{ forecast['HUMIDITY'] if forecast['HUMIDITY'] != None else "-" }} &#37; </td>
+        <td> <em> Humidity: </em> </td> <td> {{ forecast['HUMIDITY-PERCENT'] if forecast['HUMIDITY-PERCENT'] != None else "-" }} &#37; </td>
       </tr>
       <tr>
-        <td> <em>  Wind Speed: </em> </td> <td> {{ "%.1f"|format(forecast['WIND-SPEED-MPH']) if forecast['WIND-SPEED-MPH'] != None else "-"}} MPH </td>
+        <td> <em>Wind Speed: </em> </td> <td> {{ "%.1f"|format(forecast['WIND-SPEED-MPH']) if forecast['WIND-SPEED-MPH'] != None else "-"}} MPH </td>
       </tr>
       <tr>
         <td> <em> Wave Height </em> </td> <td> {{ "%.1f"|format(forecast['WAVE-HEIGHT-METERS']*3.28) if forecast['WAVE-HEIGHT-METERS'] != None else "-" }} ft </td>
@@ -70,19 +70,51 @@
             <td> <em>Newbies:</em> {{ day_table["NEWBIES"] | int }} </td>
             {% endfor %}
           </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Air Temp (F):</em> {{ day_table["AIR-TEMPERATURE-DEGREES-F"] | float }} </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Chance of Rain:</em> {{ (day_table["PRECIP-PROBABILITY"]*100) | float if day_table["PRECIP-PROBABILITY"] != None else "-" }} </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Humidity:</em> {{ day_table['HUMIDITY-PERCENT'] if day_table['HUMIDITY-PERCENT'] != None else "-" }} </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Wind Speed:</em>  {{ "%.1f"|format(day_table['WIND-SPEED-MPH']) if day_table['WIND-SPEED-MPH'] != None else "-"}} MPH </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            {% for day_table in daily_table %}
+            <td> <em>Wave Height:</em> {{ "%.1f"|format(day_table['WAVE-HEIGHT-METERS']*3.28) if day_table['WAVE-HEIGHT-METERS'] != None else "-" }} ft </td>
+            {% endfor %}
+          </tr>
       </table>
     </div>
 
     <h2>Attendence Over Time</h2>
 
     <p>
-      The next few plots show the number of new and returning attendees over
-      the past few years. There is a clear annual pattern, and always more old
+      The next plot shows the number of new and returning attendees over the
+      past few years. There is a clear annual pattern, and always more old
       friends than new ones.
     </p>
 
     {{ daily_bar_div | safe }}
-    {{ weekly_bar_div | safe }}
+
+    <p> 
+      Polar bears are slowly creeping towards work domination! The plot below
+      shows the cumulative number of attendees (blue) and new polar bear
+      members (green) over time. The numbers are big and growing.
+    </p>
+
+    {{ cumul_div | safe }}
 
     <h2>What Drives Attendence?</h2>
 
@@ -139,8 +171,9 @@
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
 
+    {{ recent_bar_script | safe }}
     {{ daily_bar_script | safe }}
-    {{ weekly_bar_script | safe }}
+    {{ cumul_script | safe }}
     {% for scatter_script in scatter_scripts %}
     {{ scatter_script | safe }}
     {% endfor %}
