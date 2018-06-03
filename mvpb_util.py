@@ -61,14 +61,8 @@ def read_sheet(sheet):
 
     # set index to datetime
     dt_text = content['DATE'] + ' ' + content['TIME']
-    content['DATETIME'] = dt_text.apply(
-        lambda x: dateutil.parser.parse(x).replace(tzinfo=US_EASTERN))
-    content.set_index('DATETIME', drop=True, inplace=True)
-
-    # # set unobserved to 0 for select columns
-    # cols = ['GROUP', 'NEWBIES']
-    # for col in cols:
-    #     content[col] = content[col].fillna(0)
-
+    dt_idx = pd.DatetimeIndex(dt_text.apply(lambda x: dateutil.parser.parse(x)))
+    dt_idx = dt_idx.tz_localize(US_EASTERN)
+    content.set_index(dt_idx, inplace=True)
     return content
 

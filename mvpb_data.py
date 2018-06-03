@@ -293,8 +293,6 @@ def add_missing_water(sheet):
             # get water conditions 
             dt = row.name
             water_data = get_water_conditions(dt, historical)
-            if any([isinstance(x, str) and x.find('MM') != -1 for x in water_data.values()]):
-                set_trace()
             # queue update for all missing cells
             sheet_row_idx = ii + 2 # index in sheet, 1-based with header
             for col_name in water_col_names:
@@ -343,7 +341,7 @@ def get_weather_conditions(key, lon=INKWELL_LON, lat=INKWELL_LAT, dt=None):
         WEATHER-SUMMARY: A human-readable text summary of this data point.
         AIR-TEMPERATURE-DEGREES-F: The air temperature in degrees Fahrenheit.
         WIND-BEARING-CW-DEGREES-FROM-N: The direction that the wind is coming
-            from in degrees, with true north at 0° and progressing clockwise.
+            from in degrees, with true north at 0 deg and progressing clockwise.
             (If windSpeed is zero, then this value will not be defined.)
         WIND-GUST-SPEED-MPH: The wind gust speed in miles per hour.
         WIND-SPEED-MPH: The wind speed in miles per hour.
