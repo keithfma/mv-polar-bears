@@ -54,6 +54,49 @@ def set_ylabel_to_positive(fig):
     fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
+def recent_obs_plot(x, y, title, x_label, y_label, num_pts=10):
+    """
+    Line plot of recent observations, generic so it can be used for multiple plots
+
+    Arguments:
+        x: x data for all observations, typically time
+        y: y data for all observations
+        title: string, plot title
+        x_label: string, label for x-axis
+        y_label: string, label for y-axis
+        num_pts: int, number of recent points to display
+    
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
+    """
+    logger.info('Generating recent observations plot "{}"'.format(title))
+
+    # create figure
+    fig = bk_plt.figure(
+        title="Daily Attendence",
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='# Attendees',
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+    
+    # add line plot
+    fig.line(x[-num_pts:], y[-num_pts:],
+        legend='Observed',
+        line_color='mediumblue',
+        line_width=2
+        )
+
+    # additional formatting
+    set_font_size(fig)
+    set_ylabel_to_positive(fig)
+
+    return bk_embed.components(fig)
+
+
 def daily_bar_plot(data):
     """
     Arguments:
@@ -351,6 +394,8 @@ def update(google_keyfile, darksky_keyfile, log_level):
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
+    recent_group_script, recent_group_div = recent_obs_plot(
+        data.index.values, data['GROUP'], 'Group Attendence', 'Time', '# People')
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
@@ -371,17 +416,14 @@ def update(google_keyfile, darksky_keyfile, log_level):
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
+            recent_group_script=recent_group_script, recent_group_div=recent_group_div,
             daily_table=daily_table,
-            daily_bar_div=daily_bar_div,
-            daily_bar_script=daily_bar_script,
-            weekly_bar_div=weekly_bar_div,
-            weekly_bar_script=weekly_bar_script,
+            daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
+            weekly_bar_div=weekly_bar_div, weekly_bar_script=weekly_bar_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            scatter_divs=scatter_divs,
-            scatter_scripts=scatter_scripts,
+            scatter_divs=scatter_divs, scatter_scripts=scatter_scripts,
             forecast=forecast_data,
-            forecast_div=forecast_div,
-            forecast_script=forecast_script,
+            forecast_div=forecast_div, forecast_script=forecast_script,
             )
         index_fp.write(index_content)
 

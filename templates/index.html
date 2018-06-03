@@ -73,6 +73,14 @@
       </table>
     </div>
 
+    <h2>Recent Observations</h2>
+    
+    <p>
+      The next plot shows group and newbie attendence over the past two weeks only. 
+    </p>
+
+    {{ recent_group_div | safe }}
+
     <h2>Attendence Over Time</h2>
 
     <p>
@@ -139,6 +147,7 @@
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
 
+    {{ recent_group_script | safe }}
     {{ daily_bar_script | safe }}
     {{ weekly_bar_script | safe }}
     {% for scatter_script in scatter_scripts %}
