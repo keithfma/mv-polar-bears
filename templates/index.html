@@ -116,6 +116,14 @@
 
     {{ daily_bar_div | safe }}
 
+    <p> 
+      Polar bears are slowly creeping towards work domination! The plot below
+      shows the cumulative number of attendees (blue) and new polar bear
+      members (green) over time. The numbers are big and growing.
+    </p>
+
+    {{ cumul_div | safe }}
+
     <h2>What Drives Attendence?</h2>
 
     <p>
@@ -173,6 +181,7 @@
 
     {{ recent_bar_script | safe }}
     {{ daily_bar_script | safe }}
+    {{ cumul_script | safe }}
     {% for scatter_script in scatter_scripts %}
     {{ scatter_script | safe }}
     {% endfor %}

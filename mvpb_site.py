@@ -100,6 +100,48 @@ def daily_bar_plot(data, limit=None):
     return bk_embed.components(fig)
 
 
+def cumul_bears_plot(data):
+    """
+    Arguments:
+        data: pandas dataframe
+        kind: field name to plot, only GROUP and NEWBIES make sense 
+
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
+    """
+    logger.info('Generating cumulative bears plot')
+
+    # create figure
+    fig = bk_plt.figure(
+        title='Cumulative Number of Polar Bears',
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='# Polar Bears',
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+
+    # prep data
+    time = data.index.values
+    grp = data['GROUP'].fillna(0).cumsum()
+    newb = data['NEWBIES'].fillna(0).cumsum()
+    
+    # plot bars
+    fig.vbar(
+        x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
+        color=GROUP_COLOR, legend='Group')
+    fig.vbar(
+        x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
+        color=NEWBIES_COLOR, legend='Newbies')
+
+    # additional formatting
+    set_font_size(fig)
+    set_ylabel_to_positive(fig)
+
+    return bk_embed.components(fig)
+
 def get_table_data(data):
     """
     Munge data to build a daily view of all available data
@@ -323,6 +365,7 @@ def update(google_keyfile, darksky_keyfile, log_level):
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
+    cumul_script, cumul_div = cumul_bears_plot(data)
     recent_bar_script, recent_bar_div = daily_bar_plot(data, 21)
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
     daily_table = get_table_data(data)
@@ -343,9 +386,10 @@ def update(google_keyfile, darksky_keyfile, log_level):
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
-            recent_bar_script=recent_bar_script, recent_bar_div=recent_bar_div,
             daily_table=daily_table,
+            recent_bar_script=recent_bar_script, recent_bar_div=recent_bar_div,
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
+            cumul_div=cumul_div, cumul_script=cumul_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             scatter_divs=scatter_divs, scatter_scripts=scatter_scripts,
             forecast=forecast_data,
