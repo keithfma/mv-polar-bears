@@ -24,6 +24,7 @@ import logging
 from datetime import datetime, timedelta
 import json
 import numpy as np
+import pandas as pd
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -54,53 +55,11 @@ def set_ylabel_to_positive(fig):
     fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
-def recent_obs_plot(x, y, title, x_label, y_label, num_pts=10):
-    """
-    Line plot of recent observations, generic so it can be used for multiple plots
-
-    Arguments:
-        x: x data for all observations, typically time
-        y: y data for all observations
-        title: string, plot title
-        x_label: string, label for x-axis
-        y_label: string, label for y-axis
-        num_pts: int, number of recent points to display
-    
-    Returns: script, div
-        script: javascript function controlling plot, wrapped in <script> HTML tags
-        div: HTML <div> modified by javascript to show plot
-    """
-    logger.info('Generating recent observations plot "{}"'.format(title))
-
-    # create figure
-    fig = bk_plt.figure(
-        title="Daily Attendence",
-        x_axis_label='Date',
-        x_axis_type='datetime',
-        y_axis_label='# Attendees',
-        plot_width=1700,
-        tools="pan,wheel_zoom,box_zoom,reset",
-        logo=None
-        )
-    
-    # add line plot
-    fig.line(x[-num_pts:], y[-num_pts:],
-        legend='Observed',
-        line_color='mediumblue',
-        line_width=2
-        )
-
-    # additional formatting
-    set_font_size(fig)
-    set_ylabel_to_positive(fig)
-
-    return bk_embed.components(fig)
-
-
-def daily_bar_plot(data):
+def daily_bar_plot(data, limit=None):
     """
     Arguments:
         data: pandas dataframe
+        limit: int, max number of results to include, set None to include all
 
     Returns: script, div
         script: javascript function controlling plot, wrapped in <script> HTML tags
@@ -108,6 +67,13 @@ def daily_bar_plot(data):
     """
     logger.info('Generating daily bar plot')
 
+    # truncate data, if requested
+    if not limit:
+        limit = 0
+    time = data.index[-limit:]
+    grp = data['GROUP'][-limit:]
+    newb = data['NEWBIES'][-limit:]
+
     # create figure
     fig = bk_plt.figure(
         title="Daily Attendence",
@@ -121,50 +87,10 @@ def daily_bar_plot(data):
     
     # add bar plots
     fig.vbar(
-        x=data.index, width=DAY_TO_MSEC, bottom=0, top=data['GROUP'],
+        x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
         color=GROUP_COLOR, legend='Group')
     fig.vbar(
-        x=data.index, width=DAY_TO_MSEC, bottom=-data['NEWBIES'], top=0,
-        color=NEWBIES_COLOR, legend='Newbies')
-
-    # additional formatting
-    set_font_size(fig)
-    set_ylabel_to_positive(fig)
-
-    return bk_embed.components(fig)
-
-
-def weekly_bar_plot(data):
-    """
-    Arguments:
-        data: pandas dataframe
-
-    Returns: script, div
-        script: javascript function controlling plot, wrapped in <script> HTML tags
-        div: HTML <div> modified by javascript to show plot
-    """
-    logger.info('Generating weekly bar plot')
-
-    # compute weekly sums
-    weekly = data[['GROUP', 'NEWBIES']].resample('W').sum()
-
-    # create figure
-    fig = bk_plt.figure(
-        title="Weekly Attendence",
-        x_axis_label='Week Start Date',
-        x_axis_type='datetime',
-        y_axis_label='Total # Attendees',
-        plot_width=1700,
-        tools="pan,wheel_zoom,box_zoom,reset",
-        logo=None
-        )
-    
-    # add bar plots
-    fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=0, top=weekly['GROUP'],
-        color=GROUP_COLOR, legend='Group')
-    fig.vbar(
-        x=weekly.index, width=DAY_TO_MSEC*7, bottom=-weekly['NEWBIES'], top=0,
+        x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
         color=NEWBIES_COLOR, legend='Newbies')
 
     # additional formatting
@@ -186,12 +112,15 @@ def get_table_data(data):
     """
     logger.info('Generating summary table')
 
-    table_data = data.replace(nan, '-')
-    table_dict = table_data.T.to_dict()
+    table_dict = data.T.to_dict()
     table = []
-    for date in sorted(table_data.index):
+    for date in sorted(data.index):
         table.append(table_dict[date])
     table.sort(key=lambda x: x['DATE'], reverse=True)
+    for ii in range(len(table)):
+        for k, v in table[ii].items():
+            if pd.isnull(v):
+                table[ii][k] = None
     return table
 
 
@@ -394,17 +323,15 @@ def update(google_keyfile, darksky_keyfile, log_level):
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
-    recent_group_script, recent_group_div = recent_obs_plot(
-        data.index.values, data['GROUP'], 'Group Attendence', 'Time', '# People')
+    recent_bar_script, recent_bar_div = daily_bar_plot(data, 21)
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
-    weekly_bar_script, weekly_bar_div = weekly_bar_plot(data)
     daily_table = get_table_data(data)
     forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
-    
+
     time = data.index.values
     obs = data['GROUP'].fillna(0).values
-    mean, std = forecast_retrospective(data, first=350)
+    mean, std = forecast_retrospective(data, first=1400)
     forecast_script, forecast_div = forecast_plot(time, obs, mean, std)
 
     env = jinja2.Environment(
@@ -416,10 +343,9 @@ def update(google_keyfile, darksky_keyfile, log_level):
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
         index_content = index_template.render(
             title=WEBPAGE_TITLE,
-            recent_group_script=recent_group_script, recent_group_div=recent_group_div,
+            recent_bar_script=recent_bar_script, recent_bar_div=recent_bar_div,
             daily_table=daily_table,
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
-            weekly_bar_div=weekly_bar_div, weekly_bar_script=weekly_bar_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             scatter_divs=scatter_divs, scatter_scripts=scatter_scripts,
             forecast=forecast_data,
