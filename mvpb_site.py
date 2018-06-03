@@ -55,6 +55,11 @@ def set_ylabel_to_positive(fig):
     fig.yaxis.formatter = bk_model.FuncTickFormatter(code="return Math.abs(tick)")
 
 
+def format_legend(fig):
+    """Simple legend formatting"""
+    fig.legend.location = "top_left"
+
+
 def daily_bar_plot(data, limit=None):
     """
     Arguments:
@@ -96,6 +101,7 @@ def daily_bar_plot(data, limit=None):
     # additional formatting
     set_font_size(fig)
     set_ylabel_to_positive(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
@@ -138,6 +144,7 @@ def cumul_bears_plot(data):
     # additional formatting
     set_font_size(fig)
     set_ylabel_to_positive(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
@@ -238,6 +245,7 @@ def forecast_plot(time, obs, pred_mean, pred_std):
 
     # additional formatting
     set_font_size(fig_a)
+    format_legend(fig_a)
 
     # create figure for forecast
     fig_b = bk_plt.figure(
@@ -258,6 +266,7 @@ def forecast_plot(time, obs, pred_mean, pred_std):
 
     # additional formatting
     set_font_size(fig_b)
+    format_legend(fig_b)
 
     return bk_embed.components(bk_layouts.column(fig_a, fig_b))
 
@@ -307,6 +316,7 @@ def scatter_plot(data, xname, yname):
 
     # additional formatting
     set_font_size(fig)
+    format_legend(fig)
 
     return bk_embed.components(fig)
 
