@@ -30,18 +30,19 @@
         <td> <em> Group Attendence:</em> </td> <td> {{ "%.1f"|format(forecast.GROUP) }} &plusmn; {{ "%.1f"|format(forecast.GROUP_STD) }} people </td>
       </tr>
       <tr>
-        <td> <em> Air Temp: </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int }} &deg;F </td> 
+        <td> <em> Air Temp: </em> </td> <td> {{ forecast['AIR-TEMPERATURE-DEGREES-F']|round|int if forecast['AIR-TEMPERATURE-DEGREES-F'] != None else "-" }} &deg;F </td> 
       </tr>
       <tr>
-        <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY'])*100|round|int }} &#37; </td> 
+        <td> <em> Chance of Rain: </em> </td>  <td> {{ (forecast['PRECIP-PROBABILITY'])*100|round|int if forecast['PRECIP-PROBABILITY'] != None else "-" }} &#37; </td> 
       </tr>
       <tr>
-        <td> <em> Humidity: </em> </td> <td> {{ forecast['HUMIDITY'] }} &#37; </td>
-      <tr>
-        <td> <em>  Wind Speed: </em> </td> <td> {{ "%.1f"|format(forecast['WIND-SPEED-MPH']) }} MPH </td>
+        <td> <em> Humidity: </em> </td> <td> {{ forecast['HUMIDITY'] if forecast['HUMIDITY'] != None else "-" }} &#37; </td>
       </tr>
       <tr>
-        <td> <em> Wave Height </em> </td> <td> {{ "%.1f"|format(forecast['WAVE-HEIGHT-METERS']*3.28) }} ft </td>
+        <td> <em>  Wind Speed: </em> </td> <td> {{ "%.1f"|format(forecast['WIND-SPEED-MPH']) if forecast['WIND-SPEED-MPH'] != None else "-"}} MPH </td>
+      </tr>
+      <tr>
+        <td> <em> Wave Height </em> </td> <td> {{ "%.1f"|format(forecast['WAVE-HEIGHT-METERS']*3.28) if forecast['WAVE-HEIGHT-METERS'] != None else "-" }} ft </td>
       </tr>
     </table>
 

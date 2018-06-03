@@ -184,11 +184,14 @@ def forecast_plot(time, obs, pred_mean, pred_std):
     """
     Plot retrospective forecast mean, variance, and residuals
     """
-    upper_bound = pred_mean + pred_std
-    lower_bound = pred_mean - pred_std
-    pred_mean[pred_mean < 0] = 0
-    upper_bound[upper_bound < 0] = 0
-    lower_bound[lower_bound < 0] = 0
+    try:
+        upper_bound = pred_mean + pred_std
+        lower_bound = pred_mean - pred_std
+        pred_mean[pred_mean < 0] = 0
+        upper_bound[upper_bound < 0] = 0
+        lower_bound[lower_bound < 0] = 0
+    except:
+        set_trace()
 
     # create figure for forecast
     fig_a = bk_plt.figure(
