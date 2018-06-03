@@ -104,7 +104,6 @@ def cumul_bears_plot(data):
     """
     Arguments:
         data: pandas dataframe
-        kind: field name to plot, only GROUP and NEWBIES make sense 
 
     Returns: script, div
         script: javascript function controlling plot, wrapped in <script> HTML tags
@@ -141,6 +140,57 @@ def cumul_bears_plot(data):
     set_ylabel_to_positive(fig)
 
     return bk_embed.components(fig)
+
+
+def attend_ratio_plot(data):
+    """
+    Arguments:
+        data: pandas dataframe
+
+    Returns: script, div
+        script: javascript function controlling plot, wrapped in <script> HTML tags
+        div: HTML <div> modified by javascript to show plot
+    """
+    logger.info('Generating attendence ratio plot')
+
+    # create figure
+    fig = bk_plt.figure(
+        title='Attendence Ratios',
+        x_axis_label='Date',
+        x_axis_type='datetime',
+        y_axis_label='Percentage',
+        plot_width=1700,
+        tools="pan,wheel_zoom,box_zoom,reset",
+        logo=None
+        )
+
+    # compute newbie fraction
+    time = data.index.values
+    grp = data['GROUP'].fillna(0)
+    newb = data['NEWBIES'].fillna(0)
+    newb_frac = newb/grp
+
+    # compute total fraction
+    total_frac = grp/newb.cumsum()
+
+    # create plot
+    fig.line(time, newb_frac*100,
+        legend='Percentage Newbies in Attendence',
+        line_color=NEWBIES_COLOR,
+        line_width=3
+        )
+    fig.line(time[1:], total_frac[1:]*100,
+        legend='Percentage of All Polar Bears in Attendence',
+        line_color=GROUP_COLOR,
+        line_width=3
+        )
+
+    # additional formatting
+    set_font_size(fig)
+    set_ylabel_to_positive(fig)
+
+    bk_plt.show(fig)
+    return None, None
 
 def get_table_data(data):
     """
@@ -198,14 +248,11 @@ def forecast_plot(time, obs, pred_mean, pred_std):
     """
     Plot retrospective forecast mean, variance, and residuals
     """
-    try:
-        upper_bound = pred_mean + pred_std
-        lower_bound = pred_mean - pred_std
-        pred_mean[pred_mean < 0] = 0
-        upper_bound[upper_bound < 0] = 0
-        lower_bound[lower_bound < 0] = 0
-    except:
-        set_trace()
+    upper_bound = pred_mean + pred_std
+    lower_bound = pred_mean - pred_std
+    pred_mean[pred_mean < 0] = 0
+    upper_bound[upper_bound < 0] = 0
+    lower_bound[lower_bound < 0] = 0
 
     # create figure for forecast
     fig_a = bk_plt.figure(
@@ -365,9 +412,11 @@ def update(google_keyfile, darksky_keyfile, log_level):
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
     
-    cumul_script, cumul_div = cumul_bears_plot(data)
-    daily_bar_script, daily_bar_div = daily_bar_plot(data)
     daily_table = get_table_data(data)
+    daily_bar_script, daily_bar_div = daily_bar_plot(data)
+    cumul_script, cumul_div = cumul_bears_plot(data)
+    ratio_script, ratio_div = attend_ratio_plot(data)
+    return
     forecast_data = get_forecast_data(data, darksky_keyfile)
     scatter_scripts, scatter_divs = all_scatter_plots(data)
 
