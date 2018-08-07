@@ -1,12 +1,10 @@
 ---
 layout: post
-title:  "{{ title }}"
+title:  "MV Polar Bears Attendence Data Exploration and Forecasting"
 date:   2018-07-19 10:20:24 -0400
 categories: jekyll update
 published: true 
 ---
-
-# Martha's Vineyard Polar Bears Data Visualization
 
 For the past several years, the wonderful MV Polar Bears group has recorded how
 many people attend each day. This post provides some basic visualizations of
@@ -14,8 +12,7 @@ the dataset and an attempt to build a predicitive model to forecast the
 expected number of attendees. My big takeaways were:
 
 1. The MV Polar Bears are reaching an amazing number of people - wow!
-1. The bears are *very* unpredictable, and don't seem much to care about the
-  weather.
+1. The bears are *very* unpredictable.
 
 ## Attendence Over Time
 
