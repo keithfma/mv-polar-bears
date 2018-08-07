@@ -33,7 +33,7 @@ NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '12pt'
 DAY_TO_MSEC = 60*60*24*1000
 US_EASTERN = pytz.timezone('US/Eastern')
-PLOT_WIDTH = 600
+PLOT_WIDTH = 750
 PLOT_HEIGHT = 600
 
 # init logging
