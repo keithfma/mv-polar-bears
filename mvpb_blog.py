@@ -1,8 +1,6 @@
 """
-Build static webpage exploring MV Polar Bears dataset
+Build Jekyll post exploring MV Polar Bears dataset
 """
-
-# TODO: include cumulative plots for total attendees and total num polar bears
 
 import os
 from mvpb_util import get_client, read_sheet
@@ -32,9 +30,11 @@ WEBPAGE_TITLE = 'MV Polar Bears!'
 PUBLISH_DIR = 'docs'
 GROUP_COLOR = 'royalblue'
 NEWBIES_COLOR = 'forestgreen'
-FONT_SIZE = '20pt'
+FONT_SIZE = '12pt'
 DAY_TO_MSEC = 60*60*24*1000
 US_EASTERN = pytz.timezone('US/Eastern')
+PLOT_WIDTH = 600
+PLOT_HEIGHT = 600
 
 # init logging
 logger = logging.getLogger('mv-polar-bears')
@@ -85,7 +85,8 @@ def daily_bar_plot(data, limit=None):
         x_axis_label='Date',
         x_axis_type='datetime',
         y_axis_label='# Attendees',
-        plot_width=1700,
+        plot_width=PLOT_WIDTH,
+        plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
@@ -123,7 +124,8 @@ def cumul_bears_plot(data):
         x_axis_label='Date',
         x_axis_type='datetime',
         y_axis_label='# Polar Bears',
-        plot_width=1700,
+        plot_width=PLOT_WIDTH,
+        plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
@@ -218,7 +220,8 @@ def forecast_plot(time, obs, pred_mean, pred_std):
         x_axis_type='datetime',
         y_axis_label='# Attendees',
         x_range=(min(time), max(time)),
-        plot_width=1700,
+        plot_width=PLOT_WIDTH,
+        plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
@@ -254,7 +257,8 @@ def forecast_plot(time, obs, pred_mean, pred_std):
         x_axis_type='datetime',
         y_axis_label='# Attendees',
         x_range=(min(time), max(time)),
-        plot_width=1700,
+        plot_width=PLOT_WIDTH,
+        plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
@@ -299,8 +303,8 @@ def scatter_plot(data, xname, yname):
         x_range=xrng,
         y_axis_label=yname,
         y_range=yrng,
-        plot_width=800,
-        plot_height=600,
+        plot_width=PLOT_WIDTH,
+        plot_height=PLOT_HEIGHT,
         match_aspect=True,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
@@ -385,12 +389,11 @@ def update(google_keyfile, darksky_keyfile, log_level):
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
-        autoescape=jinja2.select_autoescape(['html', 'css'])
         )
 
-    index_template = env.get_template('index.html')
-    with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as index_fp:
-        index_content = index_template.render(
+    blog_template = env.get_template('blog.md')
+    with open(os.path.join(PUBLISH_DIR, 'blog.md'), 'w') as blog_fp:
+        blog_content = blog_template.render(
             title=WEBPAGE_TITLE,
             daily_table=daily_table,
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
@@ -400,12 +403,7 @@ def update(google_keyfile, darksky_keyfile, log_level):
             forecast=forecast_data,
             forecast_div=forecast_div, forecast_script=forecast_script,
             )
-        index_fp.write(index_content)
-
-    style_template = env.get_template('style.css')
-    with open(os.path.join(PUBLISH_DIR, 'style.css'), 'w') as style_fp:
-        style_content = style_template.render()
-        style_fp.write(style_content)
+        blog_fp.write(blog_content)
 
     logger.info('Update complete')
 
@@ -415,7 +413,7 @@ if __name__ == '__main__':
     
     # arguments
     ap = argparse.ArgumentParser(
-        description="Update MV Polar Bears website",
+        description="Generate MV Polar Bears blog post",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('google_key', help="Path to Google API key file")
     ap.add_argument('darksky_key', help="Path to DarkSky API key file")
