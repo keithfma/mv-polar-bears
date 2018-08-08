@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 import json
 import numpy as np
 import pandas as pd
+import shutil
 
 # constants
 TEMPLATES_DIR = 'templates'
@@ -33,6 +34,7 @@ DAY_TO_MSEC = 60*60*24*1000
 US_EASTERN = pytz.timezone('US/Eastern')
 PLOT_WIDTH = 750
 PLOT_HEIGHT = 600
+NUM_RECENT = 3
 
 # init logging
 logger = logging.getLogger('mv-polar-bears')
@@ -199,20 +201,19 @@ def update(google_keyfile, log_level):
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         )
 
-    # # DEBUG
-    # set_trace()
-    # # /DEBUG
-
     site_template = env.get_template('index.html')
     with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as site_fp:
         site_content = site_template.render(
             title=WEBPAGE_TITLE,
-            daily_table=daily_table,
+            daily_table=daily_table[:NUM_RECENT][::-1],
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
             cumul_div=cumul_div, cumul_script=cumul_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             )
         site_fp.write(site_content)
+    
+    shutil.copyfile(os.path.join(TEMPLATES_DIR, 'style.css'),
+                    os.path.join(PUBLISH_DIR, 'style.css'))
 
     logger.info('Update complete')
 

@@ -6,31 +6,50 @@
     <meta charset="UTF-8">
 
     <link href="https://fonts.googleapis.com/css?family=Signika" rel="stylesheet"> 
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.css" rel="stylesheet" type="text/css">
     <link href="style.css" rel="stylesheet" type="text/css">
   </head>
 
   <body>
     
-    <div>
+    <div id="recent-obs-table">
       <table>
         <tr>
+          <th> Day </th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table["DAY-OF-WEEK"] }}</td> 
+          {% endfor %}
+        </tr>
+        <tr>
           <th> Date </th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.DATE }}</td> 
+          {% endfor %}
         </tr>
         <tr>
           <th># Bears</th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.GROUP}}</td> 
+          {% endfor %}
         </tr>
         <tr>
           <th># Newbies</th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.NEWBIES}}</td> 
+          {% endfor %}
         </tr>
       </table>
     </div>
+    
+    <br/>
 
     {{ daily_bar_div | safe }}
-    {{ cumul_div | safe }}
 
-    <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
-    <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
-    <link href="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <br/>
+
+    {{ cumul_div | safe }}
 
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
