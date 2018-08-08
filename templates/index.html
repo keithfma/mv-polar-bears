@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>{{ title }}</title>
+    <meta charset="UTF-8">
+
+    <link href="https://fonts.googleapis.com/css?family=Signika" rel="stylesheet"> 
+    <link href="style.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+    
+    <div>
+      <table>
+        <tr>
+          <th> Date </th> 
+        </tr>
+        <tr>
+          <th># Bears</th> 
+        </tr>
+        <tr>
+          <th># Newbies</th> 
+        </tr>
+      </table>
+    </div>
+
+    {{ daily_bar_div | safe }}
+    {{ cumul_div | safe }}
+
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.css" rel="stylesheet" type="text/css">
+
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
+
+    {{ daily_bar_script | safe }}
+    {{ cumul_script | safe }}
+
+  </body>
+
+</html>
