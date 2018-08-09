@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>{{ title }}</title>
+    <meta charset="UTF-8">
+
+    <link href="https://fonts.googleapis.com/css?family=Signika" rel="stylesheet"> 
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.css" rel="stylesheet" type="text/css">
+    <link href="style.css" rel="stylesheet" type="text/css">
+  </head>
+
+  <body>
+
+    <div id=summary>
+      <b><em>{{total_bears}}</em> Polar Bears have come a total of <em>{{total_attendees}}</em> times!</b> 
+    </div>
+
+    <br/>
+    
+    <div id="recent-obs-table">
+      <table>
+        <tr>
+          <th> Day </th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table["DAY-OF-WEEK"] }}</td> 
+          {% endfor %}
+        </tr>
+        <tr>
+          <th> Date </th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.DATE }}</td> 
+          {% endfor %}
+        </tr>
+        <tr>
+          <th># Bears</th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.GROUP}}</td> 
+          {% endfor %}
+        </tr>
+        <tr>
+          <th># Newbies</th> 
+          {% for day_table in daily_table %}
+          <td>{{ day_table.NEWBIES}}</td> 
+          {% endfor %}
+        </tr>
+      </table>
+    </div>
+    
+    <br/>
+
+    {{ daily_bar_div | safe }}
+
+    <br/>
+
+    {{ cumul_div | safe }}
+
+    <div id="last-update">
+      Last Updated: {{ last_update }}
+    </div>
+
+    <br/>
+
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
+    <script src="https://cdn.pydata.org/bokeh/release/bokeh-tables-0.12.15.min.js"></script>
+
+    {{ daily_bar_script | safe }}
+    {{ cumul_script | safe }}
+
+  </body>
+
+</html>
