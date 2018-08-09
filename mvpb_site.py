@@ -32,9 +32,11 @@ NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '12pt'
 DAY_TO_MSEC = 60*60*24*1000
 US_EASTERN = pytz.timezone('US/Eastern')
-PLOT_WIDTH = 750
-PLOT_HEIGHT = 600
-NUM_RECENT = 3
+PLOT_WIDTH = 612 
+PLOT_HEIGHT = 300
+NUM_RECENT = 4
+#NUM_RECENT_PLOT = int(365*1.5)
+
 
 # init logging
 logger = logging.getLogger('mv-polar-bears')
@@ -84,6 +86,7 @@ def daily_bar_plot(data, limit=None):
         title="Daily Attendence",
         x_axis_label='Date',
         x_axis_type='datetime',
+        x_range=(time[0], time[-1]),
         y_axis_label='# Attendees',
         plot_width=PLOT_WIDTH,
         plot_height=PLOT_HEIGHT,
@@ -118,22 +121,23 @@ def cumul_bears_plot(data):
     """
     logger.info('Generating cumulative bears plot')
 
+    # prep data
+    time = data.index.values
+    grp = data['GROUP'].fillna(0).cumsum()
+    newb = data['NEWBIES'].fillna(0).cumsum()
+
     # create figure
     fig = bk_plt.figure(
         title='Cumulative Number of Polar Bears',
         x_axis_label='Date',
         x_axis_type='datetime',
+        x_range=(time[0], time[-1]),
         y_axis_label='# Polar Bears',
         plot_width=PLOT_WIDTH,
         plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
         logo=None
         )
-
-    # prep data
-    time = data.index.values
-    grp = data['GROUP'].fillna(0).cumsum()
-    newb = data['NEWBIES'].fillna(0).cumsum()
     
     # plot bars
     fig.vbar(
