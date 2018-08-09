@@ -97,7 +97,7 @@ def daily_bar_plot(data, limit=None):
     # add bar plots
     fig.vbar(
         x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
-        color=GROUP_COLOR, legend='Group')
+        color=GROUP_COLOR, legend='Bears')
     fig.vbar(
         x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
         color=NEWBIES_COLOR, legend='Newbies')
@@ -128,11 +128,11 @@ def cumul_bears_plot(data):
 
     # create figure
     fig = bk_plt.figure(
-        title='Cumulative Number of Polar Bears',
+        title='Cumulative Total Attendence',
         x_axis_label='Date',
         x_axis_type='datetime',
         x_range=(time[0], time[-1]),
-        y_axis_label='# Polar Bears',
+        y_axis_label='# Attendees',
         plot_width=PLOT_WIDTH,
         plot_height=PLOT_HEIGHT,
         tools="pan,wheel_zoom,box_zoom,reset",
@@ -142,7 +142,7 @@ def cumul_bears_plot(data):
     # plot bars
     fig.vbar(
         x=time, width=DAY_TO_MSEC, bottom=0, top=grp,
-        color=GROUP_COLOR, legend='Group')
+        color=GROUP_COLOR, legend='Bears')
     fig.vbar(
         x=time, width=DAY_TO_MSEC, bottom=-newb, top=0,
         color=NEWBIES_COLOR, legend='Newbies')
