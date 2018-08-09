@@ -196,6 +196,9 @@ def update(google_keyfile, log_level):
 
     client, doc, sheet = get_client(google_keyfile)
     data = read_sheet(sheet) 
+
+    total_attendees = int(data['GROUP'].fillna(0).sum())
+    total_bears = int(data['NEWBIES'].fillna(0).sum())
     
     daily_table = get_table_data(data)
     daily_bar_script, daily_bar_div = daily_bar_plot(data)
@@ -213,6 +216,8 @@ def update(google_keyfile, log_level):
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
             cumul_div=cumul_div, cumul_script=cumul_script,
             last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            total_bears=total_bears,
+            total_attendees=total_attendees,
             )
         site_fp.write(site_content)
     

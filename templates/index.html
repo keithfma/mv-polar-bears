@@ -13,6 +13,12 @@
   </head>
 
   <body>
+
+    <div id=summary>
+      <b><em>{{total_bears}}</em> Polar Bears have come a total of <em>{{total_attendees}}</em> times!</b> 
+    </div>
+
+    <br/>
     
     <div id="recent-obs-table">
       <table>
@@ -54,6 +60,8 @@
     <div id="last-update">
       Last Updated: {{ last_update }}
     </div>
+
+    <br/>
 
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.15.min.js"></script>
     <script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-0.12.15.min.js"></script>
