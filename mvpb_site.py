@@ -218,7 +218,7 @@ def update(google_keyfile, pub_dir, log_level):
             daily_table=daily_table[:NUM_RECENT][::-1],
             daily_bar_div=daily_bar_div, daily_bar_script=daily_bar_script,
             cumul_div=cumul_div, cumul_script=cumul_script,
-            last_update=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            last_update=datetime.now(pytz.timezone('US/Eastern')).strftime('%Y-%m-%d %H:%M:%S'),
             total_bears=total_bears,
             total_attendees=total_attendees,
             )
