@@ -26,7 +26,6 @@ import shutil
 # constants
 TEMPLATES_DIR = 'templates'
 WEBPAGE_TITLE = 'MV Polar Bears!'
-PUBLISH_DIR = 'docs'
 GROUP_COLOR = 'royalblue'
 NEWBIES_COLOR = 'forestgreen'
 FONT_SIZE = '12pt'
@@ -179,12 +178,13 @@ def get_table_data(data):
     return table
 
 
-def update(google_keyfile, log_level):
+def update(google_keyfile, pub_dir, log_level):
     """
     Get data and build static HTML / JS site
     
     Arguments:
         google_keyfile: Google Sheets API key
+        pub_dir: Directory to publish output files to
         log_level: string, logging level, one of 'critical', 'error',
             'warning', 'info', 'debug'
     """
@@ -208,8 +208,11 @@ def update(google_keyfile, log_level):
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         )
 
+    if not os.path.isdir(pub_dir):
+        os.makedirs(pub_dir)
+
     site_template = env.get_template('index.html')
-    with open(os.path.join(PUBLISH_DIR, 'index.html'), 'w') as site_fp:
+    with open(os.path.join(pub_dir, 'index.html'), 'w') as site_fp:
         site_content = site_template.render(
             title=WEBPAGE_TITLE,
             daily_table=daily_table[:NUM_RECENT][::-1],
@@ -222,7 +225,13 @@ def update(google_keyfile, log_level):
         site_fp.write(site_content)
     
     shutil.copyfile(os.path.join(TEMPLATES_DIR, 'style.css'),
-                    os.path.join(PUBLISH_DIR, 'style.css'))
+                    os.path.join(pub_dir, 'style.css'))
+
+    shutil.copyfile(os.path.join(TEMPLATES_DIR, 'privacy.html'),
+                    os.path.join(pub_dir, 'privacy.html'))
+
+    shutil.copyfile(os.path.join(TEMPLATES_DIR, 'tos.html'),
+                    os.path.join(pub_dir, 'tos.html'))
 
     logger.info('Update complete')
 
@@ -235,10 +244,12 @@ if __name__ == '__main__':
         description="Generate MV Polar Bears blog post",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     ap.add_argument('google_key', help="Path to Google API key file")
+    ap.add_argument('--pub_dir', help='Directory to write (publish) output files',
+                    default='publish')
     ap.add_argument('--log_level', help='Log level to display',
                     choices=['critical', 'error', 'warning', 'info', 'debug'],
                     default='info')
     args = ap.parse_args()
 
     # run
-    update(args.google_key, args.log_level) 
+    update(args.google_key, args.pub_dir, args.log_level) 
