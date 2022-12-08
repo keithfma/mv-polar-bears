@@ -1,7 +1,7 @@
 algopy==0.5.7
 arch==4.3.1
 bokeh==0.12.15
-certifi==2018.4.16
+certifi==2022.12.7
 chardet==3.0.4
 cycler==0.10.0
 Cython==0.28.2
